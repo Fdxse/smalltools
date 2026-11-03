@@ -6,6 +6,7 @@ Small, self-contained browser tools. Each tool is a single HTML file with no dep
 | --- | --- | --- |
 | Bitwise combination table | [bitwise-table.html](bitwise-table.html) | Builds a Markdown table with one row for every combination of up to 8 two-state fields |
 | Tree leaf paths | [tree-leaves.html](tree-leaves.html) | Turns an indented list into one row per leaf, named by its full path, with a flag bit per leaf |
+| Flag decoder | [flag-decoder.html](flag-decoder.html) | Shows which flags are set in an int, binary or hex value, and builds a value by ticking flags |
 
 `index.html` is a start page that links to every tool listed in `tools.json`.
 To add a tool, drop its HTML file in the repo and add an entry to `tools.json`:

@@ -1,4 +1,5 @@
 [
   { "file": "bitwise-table.html" },
-  { "file": "tree-leaves.html", "title": "Tree Leaf Paths" }
+  { "file": "tree-leaves.html", "title": "Tree Leaf Paths" },
+  { "file": "flag-decoder.html", "title": "Flag Decoder" }
 ]

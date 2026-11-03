@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flag decoder</title>
+<style>
+  /* Same colour scheme and layout as bitwise-table.html and tree-leaves.html. */
+  :root {
+    --page-background: #f3f5f8;
+    --panel-background: #ffffff;
+    --text-color: #1b2230;
+    --muted-text-color: #5b6477;
+    --border-color: #d6dbe4;
+    --accent-color: #2457d6;
+    --accent-text-color: #ffffff;
+    --set-flag-background: #e3f3e8;
+    --warning-background: #fff3d6;
+    --warning-text-color: #6b4a00;
+    --body-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono-font: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page-background: #13161c;
+      --panel-background: #1c2028;
+      --text-color: #e5e8ee;
+      --muted-text-color: #98a1b3;
+      --border-color: #323947;
+      --accent-color: #7ea1ff;
+      --accent-text-color: #0f1420;
+      --set-flag-background: #1d3828;
+      --warning-background: #3a3018;
+      --warning-text-color: #f1d48a;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page-background: #13161c;
+    --panel-background: #1c2028;
+    --text-color: #e5e8ee;
+    --muted-text-color: #98a1b3;
+    --border-color: #323947;
+    --accent-color: #7ea1ff;
+    --accent-text-color: #0f1420;
+    --set-flag-background: #1d3828;
+    --warning-background: #3a3018;
+    --warning-text-color: #f1d48a;
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    background: var(--page-background);
+    color: var(--text-color);
+    font-family: var(--body-font);
+    font-size: 15px;
+  }
+  main {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 24px 16px 40px;
+    display: grid;
+    gap: 18px;
+  }
+  h1 { margin: 0; font-size: 24px; text-wrap: balance; }
+  h2 { margin: 0; font-size: 16px; }
+  .intro { margin: 6px 0 0; color: var(--muted-text-color); max-width: 65ch; }
+
+  section {
+    background: var(--panel-background);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 0;
+    display: grid;
+    gap: 12px;
+  }
+  .section-header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+
+  input[type="text"], textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background: var(--page-background);
+    color: var(--text-color);
+    font: inherit;
+  }
+  textarea {
+    min-height: 220px;
+    font-family: var(--mono-font);
+    font-size: 13px;
+    white-space: pre;
+    overflow-x: auto;
+    resize: vertical;
+    tab-size: 4;
+  }
+  input.value-input { font-family: var(--mono-font); font-size: 20px; padding: 9px 11px; }
+  input.value-input.invalid { border-color: #d64545; }
+  input:focus-visible, button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 1px; }
+
+  button {
+    padding: 8px 14px;
+    border: 1px solid var(--accent-color);
+    border-radius: 5px;
+    background: var(--accent-color);
+    color: var(--accent-text-color);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--accent-color); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .muted { color: var(--muted-text-color); font-variant-numeric: tabular-nums; }
+  .small { font-size: 13px; }
+
+  /* "Read as" choice drawn as a row of segmented buttons. */
+  .format-choice { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--border-color); border-radius: 5px; overflow: hidden; width: fit-content; }
+  .format-choice label { padding: 7px 14px; cursor: pointer; border-right: 1px solid var(--border-color); }
+  .format-choice label:last-child { border-right: none; }
+  .format-choice input { position: absolute; opacity: 0; pointer-events: none; }
+  .format-choice label:has(input:checked) { background: var(--accent-color); color: var(--accent-text-color); font-weight: 600; }
+  .format-choice label:has(input:focus-visible) { outline: 2px solid var(--accent-color); outline-offset: -2px; }
+
+  /* The value in every notation, side by side; wraps on narrow screens. */
+  .value-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+  .value-summary div { border: 1px solid var(--border-color); border-radius: 5px; padding: 8px 10px; min-width: 0; }
+  .value-summary dt { font-size: 12px; color: var(--muted-text-color); }
+  .value-summary dd { margin: 2px 0 0; font-family: var(--mono-font); font-size: 15px; overflow-wrap: anywhere; }
+
+  .warning-message { background: var(--warning-background); color: var(--warning-text-color); border-radius: 5px; padding: 8px 10px; margin: 0; }
+
+  /* Flag list: one tappable row per flag. Ticking a row changes the value. */
+  .flag-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border-color); border-radius: 5px; }
+  .flag-list li + li { border-top: 1px solid var(--border-color); }
+  .flag-list label {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 9px 10px;
+    min-height: 26px;
+    cursor: pointer;
+  }
+  .flag-list input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent-color); }
+  .flag-list li.is-set { background: var(--set-flag-background); }
+  .flag-name { overflow-wrap: anywhere; }
+  .flag-bit { font-family: var(--mono-font); font-size: 13px; color: var(--muted-text-color); text-align: right; white-space: nowrap; }
+  .flag-list.only-set li:not(.is-set) { display: none; }
+
+  /* Phones: 16px inputs stop iOS from zooming in on focus; buttons fill the width. */
+  @media (max-width: 640px) {
+    input[type="text"], textarea { font-size: 16px; }
+    input.value-input { font-size: 20px; }
+    .section-header .actions { width: 100%; }
+    .section-header .actions button { flex: 1 1 auto; }
+    .flag-list label { padding: 11px 10px; }
+    /* Two summary boxes per row instead of four stacked ones. */
+    .value-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    /* Empty copy status should not push the Copy link button inwards. */
+    .section-header .actions span:empty { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Flag decoder</h1>
+    <p class="intro">Type a value to see which flags are set in it. The first flag is worth 1, the second 2, the third 4 and so on, the same numbering as the Int and Binary columns in Tree leaf paths. Tick flags in the list to go the other way and build a value.</p>
+  </header>
+
+  <!-- The value to decode, and how to read it -->
+  <section aria-labelledby="valueHeading">
+    <div class="section-header">
+      <h2 id="valueHeading">Value</h2>
+      <div class="format-choice" role="radiogroup" aria-label="Read the value as">
+        <label><input type="radio" name="valueFormat" value="int" checked> Int</label>
+        <label><input type="radio" name="valueFormat" value="binary"> Binary</label>
+        <label><input type="radio" name="valueFormat" value="hex"> Hex</label>
+      </div>
+    </div>
+    <input type="text" class="value-input" id="valueInput" inputmode="numeric" autocomplete="off" spellcheck="false" aria-label="Value to decode" aria-describedby="valueHint">
+    <div class="muted small" id="valueHint">Int also takes sums like 1+4+8. A 0b or 0x prefix reads the value as binary or hex, whichever notation is picked.</div>
+    <p class="warning-message" id="valueMessage" hidden></p>
+    <dl class="value-summary" id="valueSummary" style="margin:0">
+      <div><dt>Int</dt><dd id="intOutput"></dd></div>
+      <div><dt>Binary</dt><dd id="binaryOutput"></dd></div>
+      <div><dt>Hex</dt><dd id="hexOutput"></dd></div>
+      <div><dt>Flags set</dt><dd id="setCountOutput"></dd></div>
+    </dl>
+  </section>
+
+  <!-- Every flag with its bit; set flags are ticked and highlighted -->
+  <section aria-labelledby="flagsHeading">
+    <div class="section-header">
+      <h2 id="flagsHeading">Flags</h2>
+      <div class="actions">
+        <label><input type="checkbox" id="onlySetCheckbox"> Only set flags</label>
+        <button type="button" class="secondary" id="clearAllButton">Clear</button>
+        <button type="button" class="secondary" id="setAllButton">All</button>
+      </div>
+    </div>
+    <p class="muted" id="noFlagsMessage" hidden>Add at least one flag name below.</p>
+    <ul class="flag-list" id="flagList"></ul>
+  </section>
+
+  <!-- Copy the set flags as a table -->
+  <section aria-labelledby="copyHeading">
+    <div class="section-header">
+      <h2 id="copyHeading">Copy set flags</h2>
+      <span class="muted" id="copyStatus" aria-live="polite"></span>
+    </div>
+    <div class="actions">
+      <button type="button" data-copy-format="markdown">Copy as Markdown</button>
+      <button type="button" data-copy-format="excel">Copy for Excel</button>
+      <button type="button" data-copy-format="word">Copy for Word</button>
+      <button type="button" class="secondary" data-copy-format="names">Copy names only</button>
+    </div>
+  </section>
+
+  <!-- Flag names: a plain list, or the same indented tree as Tree leaf paths -->
+  <section aria-labelledby="namesHeading">
+    <div class="section-header">
+      <h2 id="namesHeading">Flag names</h2>
+      <span class="muted" id="flagCountLabel"></span>
+    </div>
+    <div class="muted small">One flag per line, first line is bit 1. You can also paste an indented tree from Tree leaf paths: every leaf becomes a flag, named by its path.</div>
+    <textarea id="namesInput" spellcheck="false" aria-label="Flag names, one per line or as an indented tree"></textarea>
+    <label>Path separator <input type="text" id="separatorInput" value=" > " spellcheck="false" style="width:7em;font-family:var(--mono-font)"></label>
+  </section>
+
+  <!-- Link that reopens the page with the flags and value filled in -->
+  <section aria-labelledby="linkHeading">
+    <div class="section-header">
+      <h2 id="linkHeading">Link to this value</h2>
+      <div class="actions">
+        <span class="muted" id="linkCopyStatus" aria-live="polite"></span>
+        <button type="button" class="secondary" id="copyLinkButton">Copy link</button>
+      </div>
+    </div>
+    <input type="text" id="pageLinkOutput" readonly spellcheck="false" aria-label="Link to this page with the current flags and value">
+  </section>
+</main>
+
+<script>
+  // Same example tree as tree-leaves.html, so the bit numbers match that page.
+  const EXAMPLE_NAMES_TEXT = [
+    '* Car',
+    '   * Wagon',
+    '      * Blue',
+    '      * Red',
+    '   * SetUp',
+    '      * Thing 1',
+    '      * Thing 2',
+    '* Bisycle',
+    '   * Green',
+    '   * Blue',
+    '* AirPlane',
+    '   * One',
+    '      * A',
+    '   * Two',
+    '   * Three',
+  ].join('\n');
+
+  // Value shown with the example: Car > Wagon > Red (2) + Bisycle > Green (16) + AirPlane > Two (128).
+  const EXAMPLE_VALUE_TEXT = '146';
+
+  // How many spaces a tab counts as when measuring indentation.
+  const SPACES_PER_TAB = 4;
+
+  // Page elements we read from or write to.
+  const valueInput = document.getElementById('valueInput');
+  const valueFormatRadios = document.querySelectorAll('input[name="valueFormat"]');
+  const valueMessage = document.getElementById('valueMessage');
+  const intOutput = document.getElementById('intOutput');
+  const binaryOutput = document.getElementById('binaryOutput');
+  const hexOutput = document.getElementById('hexOutput');
+  const setCountOutput = document.getElementById('setCountOutput');
+  const onlySetCheckbox = document.getElementById('onlySetCheckbox');
+  const clearAllButton = document.getElementById('clearAllButton');
+  const setAllButton = document.getElementById('setAllButton');
+  const noFlagsMessage = document.getElementById('noFlagsMessage');
+  const flagList = document.getElementById('flagList');
+  const copyButtons = document.querySelectorAll('[data-copy-format]');
+  const copyStatus = document.getElementById('copyStatus');
+  const namesInput = document.getElementById('namesInput');
+  const separatorInput = document.getElementById('separatorInput');
+  const flagCountLabel = document.getElementById('flagCountLabel');
+  const pageLinkOutput = document.getElementById('pageLinkOutput');
+  const copyLinkButton = document.getElementById('copyLinkButton');
+  const linkCopyStatus = document.getElementById('linkCopyStatus');
+
+  // Flag names from the last parse, in bit order (index 0 = bit value 1).
+  let currentFlagNames = [];
+
+  // The decoded value as a BigInt, or null when the value box cannot be read.
+  // BigInt keeps the value exact past 53 flags.
+  let currentValue = 0n;
+
+  /* ---------- Reading the flag names (same parser as tree-leaves.html) ---------- */
+
+  /** Width of the leading whitespace on a line, with tabs counted as SPACES_PER_TAB. */
+  function measureIndentation(lineText) {
+    const leadingWhitespace = lineText.match(/^[ \t]*/)[0];
+    let indentWidth = 0;
+    for (const whitespaceCharacter of leadingWhitespace) {
+      indentWidth += whitespaceCharacter === '\t' ? SPACES_PER_TAB : 1;
+    }
+    return indentWidth;
+  }
+
+  /**
+   * Strip a list marker from the start of an item: "* ", "- ", "+ ", "• ",
+   * or a number like "1. " / "1) ". Text without a marker is kept as it is.
+   */
+  function stripListMarker(itemText) {
+    return itemText.replace(/^([*\-+•]|\d+[.)])\s+/, '').trim();
+  }
+
+  /**
+   * Parse the indented text into a tree of { name, children: [] } nodes.
+   * A line becomes a child of the closest line above it that is indented less.
+   * A flat list (no indentation) gives only top-level nodes, which are all leaves.
+   */
+  function parseTree(treeText) {
+    const topLevelNodes = [];
+    // Stack of open parents: { indentWidth, node }. The last entry is the deepest.
+    const parentStack = [];
+
+    treeText.split(/\r?\n/).forEach((lineText) => {
+      if (lineText.trim() === '') return;
+      const itemName = stripListMarker(lineText.trim());
+      if (itemName === '') return;
+
+      const indentWidth = measureIndentation(lineText);
+      const newNode = { name: itemName, children: [] };
+
+      // Close every parent that is not indented less than this line.
+      while (parentStack.length && parentStack[parentStack.length - 1].indentWidth >= indentWidth) {
+        parentStack.pop();
+      }
+
+      if (parentStack.length) {
+        parentStack[parentStack.length - 1].node.children.push(newNode);
+      } else {
+        topLevelNodes.push(newNode);
+      }
+      parentStack.push({ indentWidth, node: newNode });
+    });
+    return topLevelNodes;
+  }
+
+  /** Collect the path to every leaf, depth-first, in the order the leaves appear. */
+  function collectLeafPaths(nodeList, parentPath = [], leafPaths = []) {
+    nodeList.forEach((treeNode) => {
+      const nodePath = [...parentPath, treeNode.name];
+      if (treeNode.children.length === 0) {
+        leafPaths.push(nodePath);
+      } else {
+        collectLeafPaths(treeNode.children, nodePath, leafPaths);
+      }
+    });
+    return leafPaths;
+  }
+
+  /** Flag names in bit order: each leaf path joined with the separator. */
+  function readFlagNames() {
+    const separatorText = separatorInput.value;
+    return collectLeafPaths(parseTree(namesInput.value)).map((leafPath) => leafPath.join(separatorText));
+  }
+
+  /* ---------- Reading and writing the value ---------- */
+
+  /** The notation picked in the Int / Binary / Hex choice. */
+  function selectedValueFormat() {
+    return [...valueFormatRadios].find((formatRadio) => formatRadio.checked).value;
+  }
+
+  /**
+   * Turn one written number into a BigInt. A 0b or 0x prefix wins over the
+   * picked notation. Spaces and underscores are allowed as digit groupers.
+   * Throws an Error with a readable message when the text is not a number.
+   */
+  function parseSingleNumber(numberText, valueFormat) {
+    let digitsText = numberText.replace(/[\s_]/g, '');
+    let numberFormat = valueFormat;
+    if (/^0b/i.test(digitsText)) { numberFormat = 'binary'; digitsText = digitsText.slice(2); }
+    else if (/^0x/i.test(digitsText)) { numberFormat = 'hex'; digitsText = digitsText.slice(2); }
+
+    const formatRules = {
+      int: { pattern: /^\d+$/, prefix: '', label: 'whole number' },
+      binary: { pattern: /^[01]+$/, prefix: '0b', label: 'binary code (only 0 and 1)' },
+      hex: { pattern: /^[0-9a-f]+$/i, prefix: '0x', label: 'hex value (0-9 and A-F)' },
+    };
+    const formatRule = formatRules[numberFormat];
+    if (!formatRule.pattern.test(digitsText)) {
+      throw new Error(`"${numberText.trim()}" is not a ${formatRule.label}.`);
+    }
+    // BigInt reads "0b..." and "0x..." itself; decimal needs no prefix.
+    return BigInt(formatRule.prefix + digitsText);
+  }
+
+  /**
+   * Read the value box. Several numbers joined with + or | are combined with
+   * bitwise OR, so "1+4+8" and "1|4|8" both mean 13 (a flag added twice still
+   * counts once). An empty box means 0.
+   */
+  function parseValueText(valueText, valueFormat) {
+    if (valueText.trim() === '') return 0n;
+    return valueText
+      .split(/[+|]/)
+      .map((numberText) => parseSingleNumber(numberText, valueFormat))
+      .reduce((combinedValue, partValue) => combinedValue | partValue, 0n);
+  }
+
+  /** Write a value in the picked notation, for the value box. */
+  function formatValue(flagValue, valueFormat) {
+    if (valueFormat === 'binary') return binaryCode(flagValue);
+    if (valueFormat === 'hex') return flagValue.toString(16).toUpperCase();
+    return flagValue.toString();
+  }
+
+  /**
+   * Binary code padded with zeros to one digit per flag, first flag right-most,
+   * the same layout as the Binary column in tree-leaves.html.
+   */
+  function binaryCode(flagValue) {
+    return flagValue.toString(2).padStart(currentFlagNames.length, '0');
+  }
+
+  /** Bit value of the flag at a given position: 2^position. */
+  function flagBitValue(flagPosition) {
+    return 1n << BigInt(flagPosition);
+  }
+
+  /** True when the flag at this position is set in the value. */
+  function isFlagSet(flagValue, flagPosition) {
+    return (flagValue & flagBitValue(flagPosition)) !== 0n;
+  }
+
+  /** Value with every defined flag set. */
+  function allFlagsValue() {
+    return flagBitValue(currentFlagNames.length) - 1n;
+  }
+
+  /** Bit values that are set in the value but have no flag name. */
+  function unknownBitValues(flagValue) {
+    const unknownBits = [];
+    let remainingValue = flagValue >> BigInt(currentFlagNames.length);
+    let bitPosition = currentFlagNames.length;
+    while (remainingValue > 0n) {
+      if (remainingValue & 1n) unknownBits.push(flagBitValue(bitPosition).toString());
+      remainingValue >>= 1n;
+      bitPosition++;
+    }
+    return unknownBits;
+  }
+
+  /* ---------- Drawing the page ---------- */
+
+  /** Build one row per flag. Done when the names change, not on every value change. */
+  function renderFlagList() {
+    flagList.replaceChildren();
+    currentFlagNames.forEach((flagName, flagPosition) => {
+      const listItem = document.createElement('li');
+      const rowLabel = document.createElement('label');
+
+      const flagCheckbox = document.createElement('input');
+      flagCheckbox.type = 'checkbox';
+      flagCheckbox.dataset.flagPosition = String(flagPosition);
+
+      const nameText = document.createElement('span');
+      nameText.className = 'flag-name';
+      nameText.textContent = flagName;
+
+      const bitText = document.createElement('span');
+      bitText.className = 'flag-bit';
+      bitText.textContent = flagBitValue(flagPosition).toString();
+
+      rowLabel.append(flagCheckbox, nameText, bitText);
+      listItem.appendChild(rowLabel);
+      flagList.appendChild(listItem);
+    });
+
+    const hasFlags = currentFlagNames.length > 0;
+    noFlagsMessage.hidden = hasFlags;
+    flagList.hidden = !hasFlags;
+    flagCountLabel.textContent = `${currentFlagNames.length} ${currentFlagNames.length === 1 ? 'flag' : 'flags'}`;
+  }
+
+  /** Update ticks, highlights, the summary boxes, copy buttons and the link. */
+  function renderValue() {
+    const valueIsReadable = currentValue !== null;
+    const displayValue = valueIsReadable ? currentValue : 0n;
+
+    // Tick and highlight each set flag.
+    flagList.querySelectorAll('li').forEach((listItem, flagPosition) => {
+      const flagIsSet = valueIsReadable && isFlagSet(displayValue, flagPosition);
+      listItem.classList.toggle('is-set', flagIsSet);
+      listItem.querySelector('input').checked = flagIsSet;
+    });
+
+    // The value in every notation.
+    intOutput.textContent = valueIsReadable ? displayValue.toString() : '?';
+    binaryOutput.textContent = valueIsReadable ? binaryCode(displayValue) : '?';
+    hexOutput.textContent = valueIsReadable ? '0x' + displayValue.toString(16).toUpperCase() : '?';
+    const setFlagCount = valueIsReadable ? setFlagNames().length : 0;
+    setCountOutput.textContent = valueIsReadable ? `${setFlagCount} of ${currentFlagNames.length}` : '?';
+
+    // Copying an empty selection makes no sense.
+    copyButtons.forEach((copyButton) => { copyButton.disabled = setFlagCount === 0; });
+    copyStatus.textContent = '';
+
+    pageLinkOutput.value = buildPageLink();
+    linkCopyStatus.textContent = '';
+  }
+
+  /** Show a problem with the value (unreadable, or bits without a name), or hide the box. */
+  function showValueMessage(messageText) {
+    valueMessage.textContent = messageText;
+    valueMessage.hidden = !messageText;
+    valueInput.classList.toggle('invalid', currentValue === null);
+  }
+
+  /** Re-read the value box and redraw. */
+  function refreshFromValueBox() {
+    try {
+      currentValue = parseValueText(valueInput.value, selectedValueFormat());
+      const unknownBits = unknownBitValues(currentValue);
+      showValueMessage(unknownBits.length
+        ? `This value also has bits that no flag is named for: ${unknownBits.join(', ')}.`
+        : '');
+    } catch (parseError) {
+      currentValue = null;
+      showValueMessage(parseError.message);
+    }
+    renderValue();
+  }
+
+  /** Set a new value from the flag list or buttons, and write it into the value box. */
+  function applyValue(newValue) {
+    currentValue = newValue;
+    valueInput.value = formatValue(newValue, selectedValueFormat());
+    showValueMessage('');
+    renderValue();
+  }
+
+  /** Re-read the flag names, rebuild the list, then decode the value again. */
+  function refreshFromNames() {
+    currentFlagNames = readFlagNames();
+    renderFlagList();
+    refreshFromValueBox();
+  }
+
+  /** Names and bit values of the flags set in the current value. */
+  function setFlagNames() {
+    if (currentValue === null) return [];
+    return currentFlagNames.filter((flagName, flagPosition) => isFlagSet(currentValue, flagPosition));
+  }
+
+  /* ---------- Copying ---------- */
+
+  /** Set flags as a grid of strings (header row first) with #, Int, Binary and Name. */
+  function buildSetFlagsGrid() {
+    const tableGrid = [['#', 'Int', 'Binary', 'Name']];
+    currentFlagNames.forEach((flagName, flagPosition) => {
+      if (!isFlagSet(currentValue, flagPosition)) return;
+      const bitValue = flagBitValue(flagPosition);
+      tableGrid.push([String(flagPosition + 1), bitValue.toString(), binaryCode(bitValue), flagName]);
+    });
+    // Last row: the whole value, so the table shows what it adds up to.
+    tableGrid.push(['', currentValue.toString(), binaryCode(currentValue), 'Total']);
+    return tableGrid;
+  }
+
+  // Column that holds the binary code, so Excel keeps its leading zeros.
+  const BINARY_COLUMN_INDEX = 2;
+
+  /** Make text safe for a Markdown table cell. */
+  function escapeMarkdownCell(cellText) {
+    return cellText.replace(/\r?\n/g, ' ').trim().replace(/\|/g, '\\|');
+  }
+
+  /** Markdown table: pipe-separated rows with a --- separator under the header. */
+  function gridToMarkdown(tableGrid) {
+    const [headerCells, ...bodyRows] = tableGrid;
+    const toMarkdownLine = (rowCells) => '| ' + rowCells.map(escapeMarkdownCell).join(' | ') + ' |';
+    return [
+      toMarkdownLine(headerCells),
+      '| ' + headerCells.map(() => '---').join(' | ') + ' |',
+      ...bodyRows.map(toMarkdownLine),
+    ].join('\n');
+  }
+
+  /**
+   * Tab-separated text for Excel. Bit codes like "0010" would lose their
+   * leading zeros, so that column is written as ="0010".
+   */
+  function gridToTabSeparated(tableGrid, keepTextColumnIndex) {
+    return tableGrid
+      .map((rowCells, rowIndex) => rowCells
+        .map((cellText, columnIndex) => {
+          const cleanText = cellText.replace(/[\t\r\n]+/g, ' ');
+          return rowIndex > 0 && columnIndex === keepTextColumnIndex ? `="${cleanText}"` : cleanText;
+        })
+        .join('\t'))
+      .join('\r\n');
+  }
+
+  /** Escape text for use inside HTML markup. */
+  function escapeHtml(rawText) {
+    return rawText
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /** HTML table with simple inline borders; Word and Excel paste it as a real table. */
+  function gridToHtmlTable(tableGrid) {
+    const cellStyle = 'border:1px solid #999;padding:4px 8px;mso-number-format:\'\\@\';';
+    const [headerCells, ...bodyRows] = tableGrid;
+    const headerHtml = '<tr>' + headerCells
+      .map((cellText) => `<th style="${cellStyle}background:#eee;text-align:left;">${escapeHtml(cellText)}</th>`)
+      .join('') + '</tr>';
+    const bodyHtml = bodyRows
+      .map((rowCells) => '<tr>' + rowCells
+        .map((cellText) => `<td style="${cellStyle}">${escapeHtml(cellText)}</td>`)
+        .join('') + '</tr>')
+      .join('');
+    return `<table style="border-collapse:collapse;"><thead>${headerHtml}</thead><tbody>${bodyHtml}</tbody></table>`;
+  }
+
+  /** Fallback copy using the older copy command, for browsers without the Clipboard API. */
+  function copyWithCopyCommand(plainText, htmlText) {
+    const fillClipboard = (copyEvent) => {
+      copyEvent.clipboardData.setData('text/plain', plainText);
+      if (htmlText) copyEvent.clipboardData.setData('text/html', htmlText);
+      copyEvent.preventDefault();
+    };
+    document.addEventListener('copy', fillClipboard, { once: true });
+    const copySucceeded = document.execCommand('copy');
+    document.removeEventListener('copy', fillClipboard);
+    return copySucceeded;
+  }
+
+  /** Put text (and optionally HTML) on the clipboard. */
+  async function writeToClipboard(plainText, htmlText) {
+    try {
+      if (htmlText && window.ClipboardItem) {
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/plain': new Blob([plainText], { type: 'text/plain' }),
+          'text/html': new Blob([htmlText], { type: 'text/html' }),
+        })]);
+      } else {
+        await navigator.clipboard.writeText(plainText);
+      }
+      return true;
+    } catch (clipboardError) {
+      return copyWithCopyCommand(plainText, htmlText);
+    }
+  }
+
+  /* ---------- Link with the flags and value filled in ---------- */
+
+  /**
+   * Encode only the characters that would break the query string (% & = # +)
+   * and line breaks. Spaces stay as plain spaces so the link is readable.
+   */
+  function encodeQueryPart(rawText) {
+    return rawText
+      .replace(/%/g, '%25').replace(/&/g, '%26').replace(/=/g, '%3D')
+      .replace(/#/g, '%23').replace(/\+/g, '%2B')
+      .replace(/\r?\n/g, '%0A').replace(/\t/g, '%09');
+  }
+
+  /**
+   * This page's address with ?tree=...&value=... . The value is always written
+   * as a plain int so the link does not depend on the Int/Binary/Hex choice.
+   * Uses the same ?tree= name as tree-leaves.html, so a tree link from that
+   * page works here after changing the file name.
+   */
+  function buildPageLink() {
+    const pageAddress = window.location.href.split(/[?#]/)[0];
+    const queryParts = [];
+    if (namesInput.value.trim()) queryParts.push(`tree=${encodeQueryPart(namesInput.value)}`);
+    if (currentValue !== null) queryParts.push(`value=${currentValue.toString()}`);
+    return queryParts.length ? `${pageAddress}?${queryParts.join('&')}` : pageAddress;
+  }
+
+  /** Read one ?name=... from the address. Plain spaces, + and %20 all mean a space. */
+  function readQueryParameter(parameterName) {
+    const parameterMatch = window.location.search.match(new RegExp(`[?&]${parameterName}=([^&]*)`));
+    if (!parameterMatch) return null;
+    const withSpaces = parameterMatch[1].replace(/\+/g, ' ');
+    try { return decodeURIComponent(withSpaces); } catch (decodeError) { return withSpaces; }
+  }
+
+  /* ---------- Events ---------- */
+
+  // Typing a value decodes it straight away.
+  valueInput.addEventListener('input', refreshFromValueBox);
+
+  // Switching notation rewrites the current value in the new one, when it is readable.
+  valueFormatRadios.forEach((formatRadio) => formatRadio.addEventListener('change', () => {
+    // Phones get the matching keyboard: digits for Int and Binary, text for Hex.
+    valueInput.inputMode = selectedValueFormat() === 'hex' ? 'text' : 'numeric';
+    if (currentValue !== null) applyValue(currentValue);
+    else refreshFromValueBox();
+  }));
+
+  // Ticking a flag flips its bit. One listener on the list covers every row.
+  flagList.addEventListener('change', (changeEvent) => {
+    const flagPosition = Number(changeEvent.target.dataset.flagPosition);
+    const startValue = currentValue ?? 0n;
+    applyValue(startValue ^ flagBitValue(flagPosition));
+  });
+
+  // Quick buttons: no flags, or every named flag.
+  clearAllButton.addEventListener('click', () => applyValue(0n));
+  setAllButton.addEventListener('click', () => applyValue(allFlagsValue()));
+
+  // Hide the rows that are not set.
+  onlySetCheckbox.addEventListener('change', () => {
+    flagList.classList.toggle('only-set', onlySetCheckbox.checked);
+  });
+
+  // Changing names or separator rebuilds the list.
+  [namesInput, separatorInput].forEach((inputElement) => inputElement.addEventListener('input', refreshFromNames));
+
+  // One handler for all copy buttons; the data attribute picks the format.
+  copyButtons.forEach((copyButton) => {
+    copyButton.addEventListener('click', async () => {
+      const copyFormat = copyButton.dataset.copyFormat;
+      let plainText;
+      let htmlText = null;
+
+      if (copyFormat === 'names') {
+        // One set flag name per line, nothing else.
+        plainText = setFlagNames().join('\n');
+      } else if (copyFormat === 'markdown') {
+        plainText = gridToMarkdown(buildSetFlagsGrid());
+      } else {
+        // Excel and Word: tab-separated text plus an HTML table. Only Excel needs the ="..." trick.
+        const tableGrid = buildSetFlagsGrid();
+        plainText = gridToTabSeparated(tableGrid, copyFormat === 'excel' ? BINARY_COLUMN_INDEX : -1);
+        htmlText = gridToHtmlTable(tableGrid);
+      }
+
+      const copySucceeded = await writeToClipboard(plainText, htmlText);
+      copyStatus.textContent = copySucceeded
+        ? 'Copied'
+        : 'Your browser blocked the clipboard. Try again in another browser.';
+    });
+  });
+
+  // Copy the link as plain text, with spaces kept as spaces.
+  copyLinkButton.addEventListener('click', async () => {
+    const copySucceeded = await writeToClipboard(pageLinkOutput.value, null);
+    if (!copySucceeded) pageLinkOutput.select();
+    linkCopyStatus.textContent = copySucceeded ? 'Copied' : 'Selected. Press Ctrl+C to copy.';
+  });
+
+  // Tab in the names box indents instead of moving focus (Esc then Tab still leaves).
+  let tabIndentsNames = true;
+  namesInput.addEventListener('keydown', (keyEvent) => {
+    if (keyEvent.key === 'Escape') { tabIndentsNames = false; return; }
+    if (keyEvent.key !== 'Tab' || !tabIndentsNames || keyEvent.shiftKey) return;
+    keyEvent.preventDefault();
+    namesInput.setRangeText('\t', namesInput.selectionStart, namesInput.selectionEnd, 'end');
+    refreshFromNames();
+  });
+  namesInput.addEventListener('focus', () => { tabIndentsNames = true; });
+
+  /* ---------- Start ---------- */
+
+  // Names from ?tree= (or ?flags=), else the example. Value from ?value=, else the example value.
+  const namesFromAddress = readQueryParameter('tree') ?? readQueryParameter('flags');
+  const valueFromAddress = readQueryParameter('value');
+  namesInput.value = namesFromAddress ?? EXAMPLE_NAMES_TEXT;
+  valueInput.value = valueFromAddress ?? (namesFromAddress === null ? EXAMPLE_VALUE_TEXT : '0');
+  refreshFromNames();
+</script>
+</body>
+</html>
