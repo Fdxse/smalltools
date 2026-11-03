@@ -3,5 +3,6 @@
   { "file": "tree-leaves.html", "title": "Tree Leaf Paths" },
   { "file": "flag-decoder.html", "title": "Flag Decoder" },
   { "file": "table-converter.html", "title": "Table Converter" },
-  { "file": "pairwise.html", "title": "Pairwise Test Cases" }
+  { "file": "pairwise.html", "title": "Pairwise Test Cases" },
+  { "file": "decision-table.html", "title": "Decision Table" }
 ]

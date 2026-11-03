@@ -155,11 +155,15 @@
 
   /* Phone width: name on its own line, states below it. */
   @media (max-width: 560px) {
-    .field-grid { grid-template-columns: 22px minmax(0, 1fr) minmax(0, 1fr) 34px; }
+    /* Every piece gets a fixed column; "dense" lets each field's two lines fill in
+       from the top, so the remove button sits beside both lines of its own field. */
+    .field-grid { grid-template-columns: 22px minmax(0, 1fr) minmax(0, 1fr) 34px; grid-auto-flow: row dense; }
     .field-grid .header-cell { display: none; }
-    .field-grid .bit-number { grid-row: span 2; }
+    .field-grid .bit-number { grid-column: 1; grid-row: span 2; }
     .field-grid .field-name-input { grid-column: 2 / 4; }
-    .field-grid .remove-button { grid-row: span 2; }
+    .field-grid .state-a-input { grid-column: 2; }
+    .field-grid .state-b-input { grid-column: 3; }
+    .field-grid .remove-button { grid-column: 4; grid-row: span 2; align-self: stretch; }
   }
 </style>
 
@@ -497,6 +501,9 @@
       nameInput.classList.add('field-name-input');
       const stateAInput = createFieldInput(fieldIndex, 'stateA', DEFAULT_STATE_A, `State A for field ${fieldNumber}`);
       const stateBInput = createFieldInput(fieldIndex, 'stateB', DEFAULT_STATE_B, `State B for field ${fieldNumber}`);
+      // Classes used by the phone layout to place the state boxes on the second line.
+      stateAInput.classList.add('state-a-input');
+      stateBInput.classList.add('state-b-input');
 
       const removeButton = document.createElement('button');
       removeButton.type = 'button';

@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{margin:0}</style>
+<title>Decision table</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Same look as bitwise-table.html: one centred column of panels. */
+  :root {
+    --page-background: #f3f5f8;
+    --panel-background: #ffffff;
+    --text-color: #1b2230;
+    --muted-text-color: #5b6477;
+    --border-color: #d6dbe4;
+    --accent-color: #2457d6;
+    --accent-text-color: #ffffff;
+    --state-a-background: #e3f3e8;
+    --state-b-background: #fbe8e4;
+    --rule-result-background: #e6edff;
+    --warning-color: #a3560b;
+    --body-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono-font: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page-background: #13161c;
+      --panel-background: #1c2028;
+      --text-color: #e5e8ee;
+      --muted-text-color: #98a1b3;
+      --border-color: #323947;
+      --accent-color: #7ea1ff;
+      --accent-text-color: #0f1420;
+      --state-a-background: #1d3828;
+      --state-b-background: #432520;
+      --rule-result-background: #1f2c4d;
+      --warning-color: #f0b46a;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page-background: #13161c;
+    --panel-background: #1c2028;
+    --text-color: #e5e8ee;
+    --muted-text-color: #98a1b3;
+    --border-color: #323947;
+    --accent-color: #7ea1ff;
+    --accent-text-color: #0f1420;
+    --state-a-background: #1d3828;
+    --state-b-background: #432520;
+    --rule-result-background: #1f2c4d;
+    --warning-color: #f0b46a;
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--page-background);
+    color: var(--text-color);
+    font-family: var(--body-font);
+    font-size: 15px;
+  }
+  main {
+    max-width: 920px;
+    margin: 0 auto;
+    padding-block: 24px 40px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: grid;
+    gap: 18px;
+  }
+  h1 { margin: 0; font-size: 24px; text-wrap: balance; }
+  h2 { margin: 0; font-size: 16px; }
+  .intro { margin: 6px 0 0; color: var(--muted-text-color); max-width: 65ch; }
+
+  section {
+    background: var(--panel-background);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 0;
+    display: grid;
+    gap: 12px;
+  }
+  .section-header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+
+  /* Field rows: bit number, name, state A, state B, remove button. */
+  .field-grid {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) 34px;
+    gap: 8px;
+    align-items: center;
+  }
+  .column-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted-text-color);
+  }
+  .bit-number { font-family: var(--mono-font); color: var(--muted-text-color); text-align: right; font-variant-numeric: tabular-nums; }
+
+  input[type="text"], select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background: var(--page-background);
+    color: var(--text-color);
+    font: inherit;
+  }
+  input:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 1px; }
+
+  button {
+    padding: 8px 14px;
+    border: 1px solid var(--accent-color);
+    border-radius: 5px;
+    background: var(--accent-color);
+    color: var(--accent-text-color);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--accent-color); }
+  button.remove-button, button.small-button {
+    padding: 4px 0;
+    min-width: 34px;
+    background: transparent;
+    border-color: var(--border-color);
+    color: var(--muted-text-color);
+    font-weight: 400;
+  }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .muted { color: var(--muted-text-color); font-variant-numeric: tabular-nums; }
+  .hint { margin: 0; color: var(--muted-text-color); font-size: 13px; max-width: 70ch; }
+
+  /* Rule cards: one per rule, conditions in a wrapping grid, result below. */
+  .rule-list { display: grid; gap: 10px; }
+  .rule-card {
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+    min-width: 0;
+  }
+  .rule-card-header { display: flex; gap: 8px; align-items: center; }
+  .rule-title { font-weight: 600; }
+  .rule-status { flex: 1; min-width: 0; font-size: 13px; color: var(--muted-text-color); }
+  .rule-status.warning { color: var(--warning-color); }
+  .rule-buttons { display: flex; gap: 6px; }
+  .condition-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 8px;
+  }
+  .labelled-control { display: grid; gap: 4px; min-width: 0; font-size: 13px; color: var(--muted-text-color); }
+  .labelled-control > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* A condition that is set gets the accent border so it stands out from "Any". */
+  select.condition-set { border-color: var(--accent-color); color: var(--text-color); font-weight: 600; }
+  .rule-summary { margin: 0; font-size: 13px; color: var(--muted-text-color); overflow-wrap: anywhere; }
+  .default-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; }
+
+  /* Preview table scrolls inside its own box on narrow screens. */
+  .table-scroller { overflow-x: auto; }
+  table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { border: 1px solid var(--border-color); padding: 5px 10px; text-align: left; white-space: nowrap; }
+  th { font-size: 13px; }
+  td.state-a { background: var(--state-a-background); }
+  td.state-b { background: var(--state-b-background); }
+  td.bit-pattern { font-family: var(--mono-font); color: var(--muted-text-color); }
+  td.rule-result { background: var(--rule-result-background); font-weight: 600; }
+  td.default-result { color: var(--muted-text-color); }
+  td.rule-number { color: var(--muted-text-color); }
+
+  /* Phone width: name on its own line, states below it; bigger text so iOS does not zoom. */
+  @media (max-width: 560px) {
+    /* Every piece gets a fixed column; "dense" lets each field's two lines fill in
+       from the top, so the remove button sits beside both lines of its own field. */
+    .field-grid { grid-template-columns: 22px minmax(0, 1fr) minmax(0, 1fr) 34px; grid-auto-flow: row dense; }
+    .field-grid .header-cell { display: none; }
+    .field-grid .bit-number { grid-column: 1; grid-row: span 2; }
+    .field-grid .field-name-input { grid-column: 2 / 4; }
+    .field-grid .state-a-input { grid-column: 2; }
+    .field-grid .state-b-input { grid-column: 3; }
+    .field-grid .remove-button { grid-column: 4; grid-row: span 2; align-self: stretch; }
+    input[type="text"], select { font-size: 16px; }
+    .condition-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .default-row { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    .section-header .actions button { flex: 1 1 auto; }
+  }
+</style>
+
+</head><body>
+<main>
+  <header>
+    <h1>Decision table</h1>
+    <p class="intro">Every combination of up to 8 two-state fields, with an Expected result column. Write a few rules and the result fills itself in: the first rule that matches a row wins, and rows no rule matches get the default result.</p>
+  </header>
+
+  <!-- Field editor (same as the bitwise combination table) -->
+  <section aria-labelledby="fieldsHeading">
+    <div class="section-header">
+      <h2 id="fieldsHeading">Fields</h2>
+      <span class="muted" id="fieldCountLabel"></span>
+    </div>
+    <div class="field-grid" id="fieldGrid"></div>
+    <div class="actions">
+      <button type="button" class="secondary" id="addFieldButton">Add field</button>
+      <label><input type="checkbox" id="includeRowNumber" checked> Row number column</label>
+      <label><input type="checkbox" id="includeBitPattern"> Bit pattern column</label>
+      <label><input type="checkbox" id="includeRuleColumn"> Rule column</label>
+      <label><input type="checkbox" id="includeNoteColumn"> Note column</label>
+    </div>
+  </section>
+
+  <!-- Rule editor: each rule picks a state per field (or Any) and a result -->
+  <section aria-labelledby="rulesHeading">
+    <div class="section-header">
+      <h2 id="rulesHeading">Rules</h2>
+      <button type="button" class="secondary" id="addRuleButton">Add rule</button>
+    </div>
+    <p class="hint">Pick a state for the fields the rule cares about and leave the rest on “Any”. All picked states must match. Rules are checked from top to bottom.</p>
+    <div class="rule-list" id="ruleList"></div>
+    <label class="default-row" for="defaultResultInput">
+      <span class="rule-title">Otherwise</span>
+      <input type="text" id="defaultResultInput" placeholder="Result when no rule matches, e.g. OK">
+    </label>
+  </section>
+
+  <!-- Link that reopens the page with the current fields and rules filled in -->
+  <section aria-labelledby="linkHeading">
+    <div class="section-header">
+      <h2 id="linkHeading">Link to this table</h2>
+      <div class="actions">
+        <span class="muted" id="linkCopyStatus" aria-live="polite"></span>
+        <button type="button" class="secondary" id="copyLinkButton">Copy link</button>
+      </div>
+    </div>
+    <input type="text" id="pageLinkOutput" readonly spellcheck="false" aria-label="Link to this page with the current fields and rules">
+  </section>
+
+  <!-- Result table with copy buttons for each target format -->
+  <section aria-labelledby="previewHeading">
+    <div class="section-header">
+      <h2 id="previewHeading">Decision table</h2>
+      <div class="actions">
+        <span class="muted" id="copyStatus" aria-live="polite"></span>
+        <button type="button" data-copy-format="markdown">Copy as Markdown</button>
+        <button type="button" data-copy-format="excel">Copy for Excel</button>
+        <button type="button" data-copy-format="word">Copy for Word</button>
+      </div>
+    </div>
+    <p class="muted" id="resultSummary"></p>
+    <p class="muted" id="emptyMessage" hidden>Give at least one field a name to generate the table.</p>
+    <div class="table-scroller"><table id="previewTable"></table></div>
+  </section>
+</main>
+
+<script>
+  // Maximum number of fields (2^8 = 256 rows).
+  const MAX_FIELD_COUNT = 8;
+
+  // Default labels used when a state box is left empty.
+  const DEFAULT_STATE_A = 'Yes';
+  const DEFAULT_STATE_B = 'No';
+
+  // Header texts of the extra columns.
+  const RESULT_COLUMN_HEADER = 'Expected result';
+  const RULE_COLUMN_HEADER = 'Rule';
+  const NOTE_COLUMN_HEADER = 'Note';
+
+  // Text in the Rule column for rows that got the default result.
+  const DEFAULT_RULE_LABEL = 'Default';
+
+  // Query-string names for rules and the default result. Field names are
+  // every other parameter, so these two start with an underscore to stay apart.
+  const RULE_QUERY_NAME = '_rule';
+  const DEFAULT_QUERY_NAME = '_default';
+
+  // Each field gets a stable id, so rules keep pointing at the right field
+  // when another field is removed.
+  let nextFieldId = 1;
+  function createField(name, stateA, stateB) {
+    return { id: nextFieldId++, name, stateA, stateB };
+  }
+
+  // Current list of fields. Starts with the same example as the bitwise table.
+  let fieldList = [
+    createField('Firstname', 'Yes', 'No'),
+    createField('Address', 'Yes', 'No'),
+    createField('Workaddress', 'Set', 'Not set'),
+  ];
+
+  /*
+   * Current list of rules. Each rule is
+   *   { conditionByFieldId: { [fieldId]: 'A' | 'B' }, result: 'text' }
+   * A field missing from conditionByFieldId means "Any".
+   */
+  let ruleList = [
+    { conditionByFieldId: { [fieldList[0].id]: 'B' }, result: 'Error: name missing' },
+    { conditionByFieldId: { [fieldList[1].id]: 'B', [fieldList[2].id]: 'B' }, result: 'Error: no address' },
+  ];
+
+  // Result for rows that no rule matches.
+  let defaultResult = 'OK';
+
+  // Page elements we read from or write to.
+  const fieldGrid = document.getElementById('fieldGrid');
+  const addFieldButton = document.getElementById('addFieldButton');
+  const fieldCountLabel = document.getElementById('fieldCountLabel');
+  const includeRowNumberCheckbox = document.getElementById('includeRowNumber');
+  const includeBitPatternCheckbox = document.getElementById('includeBitPattern');
+  const includeRuleColumnCheckbox = document.getElementById('includeRuleColumn');
+  const includeNoteColumnCheckbox = document.getElementById('includeNoteColumn');
+  const ruleListElement = document.getElementById('ruleList');
+  const addRuleButton = document.getElementById('addRuleButton');
+  const defaultResultInput = document.getElementById('defaultResultInput');
+  const previewTable = document.getElementById('previewTable');
+  const emptyMessage = document.getElementById('emptyMessage');
+  const resultSummary = document.getElementById('resultSummary');
+  const copyButtons = document.querySelectorAll('[data-copy-format]');
+  const copyStatus = document.getElementById('copyStatus');
+  const pageLinkOutput = document.getElementById('pageLinkOutput');
+  const copyLinkButton = document.getElementById('copyLinkButton');
+  const linkCopyStatus = document.getElementById('linkCopyStatus');
+
+  // Per-rule elements that refreshOutput() updates without rebuilding the
+  // rule editor (rebuilding would steal focus from the box being typed in).
+  let ruleStatusElements = [];
+  let ruleSummaryElements = [];
+
+  // The table as a plain grid of strings (header row first), rebuilt on every change.
+  // All three copy formats are generated from this.
+  let currentTableGrid = [];
+
+  /**
+   * Make text safe for a Markdown table cell: no newlines, and pipes escaped
+   * so they do not split the cell.
+   */
+  function escapeMarkdownCell(cellText) {
+    return cellText.replace(/\r?\n/g, ' ').trim().replace(/\|/g, '\\|');
+  }
+
+  /**
+   * Fields that count towards the table: the ones with a name.
+   * Empty state boxes fall back to Yes/No. The id is kept so rules can find them.
+   */
+  function getActiveFields() {
+    return fieldList
+      .filter((field) => field.name.trim() !== '')
+      .map((field) => ({
+        id: field.id,
+        name: field.name.trim(),
+        stateA: field.stateA.trim() || DEFAULT_STATE_A,
+        stateB: field.stateB.trim() || DEFAULT_STATE_B,
+      }));
+  }
+
+  /**
+   * Build every combination. Each row is a number from 0 to 2^n - 1.
+   * The first field is the most significant bit, so it changes slowest and
+   * the last field alternates every row. Bit 0 = state A, bit 1 = state B.
+   * Returns a list of { bitPattern, usesStateB: [bool per field] }.
+   */
+  function buildCombinations(activeFields) {
+    const fieldCount = activeFields.length;
+    const combinationCount = 2 ** fieldCount;
+    const combinationList = [];
+
+    for (let combinationNumber = 0; combinationNumber < combinationCount; combinationNumber++) {
+      const usesStateB = activeFields.map((field, fieldPosition) => {
+        const bitShift = fieldCount - 1 - fieldPosition;
+        return ((combinationNumber >> bitShift) & 1) === 1;
+      });
+      combinationList.push({
+        bitPattern: combinationNumber.toString(2).padStart(fieldCount, '0'),
+        usesStateB,
+      });
+    }
+    return combinationList;
+  }
+
+  /**
+   * Does a rule have at least one condition on a named field? A rule with every
+   * field on "Any" is skipped, so a freshly added rule does not take over every
+   * row (the "Otherwise" box is the place for that).
+   */
+  function ruleHasConditions(rule, activeFields) {
+    return activeFields.some((field) => rule.conditionByFieldId[field.id]);
+  }
+
+  /**
+   * Does a rule match one combination? Every condition on an active field must
+   * agree with the row; conditions on unnamed (inactive) fields are ignored.
+   */
+  function ruleMatchesCombination(rule, activeFields, combination) {
+    if (!ruleHasConditions(rule, activeFields)) return false;
+    return activeFields.every((field, fieldPosition) => {
+      const wantedState = rule.conditionByFieldId[field.id];
+      if (!wantedState) return true; // "Any"
+      const rowState = combination.usesStateB[fieldPosition] ? 'B' : 'A';
+      return wantedState === rowState;
+    });
+  }
+
+  /**
+   * Work out the expected result of every combination.
+   * The first matching rule wins; rows no rule matches get the default.
+   * Returns one { result, ruleIndex } per combination (ruleIndex -1 = default).
+   */
+  function decideResults(activeFields, combinationList) {
+    return combinationList.map((combination) => {
+      const ruleIndex = ruleList.findIndex((rule) => ruleMatchesCombination(rule, activeFields, combination));
+      if (ruleIndex === -1) return { result: defaultResult.trim(), ruleIndex: -1 };
+      return { result: ruleList[ruleIndex].result.trim(), ruleIndex };
+    });
+  }
+
+  /** Header labels in table order, shared by the copy grid and the preview. */
+  function buildHeaderLabels(activeFields, columnOptions) {
+    const headerLabels = [];
+    if (columnOptions.showRowNumber) headerLabels.push('#');
+    if (columnOptions.showBitPattern) headerLabels.push('Bits');
+    activeFields.forEach((field) => headerLabels.push(field.name));
+    headerLabels.push(RESULT_COLUMN_HEADER);
+    if (columnOptions.showRuleColumn) headerLabels.push(RULE_COLUMN_HEADER);
+    if (columnOptions.showNoteColumn) headerLabels.push(NOTE_COLUMN_HEADER);
+    return headerLabels;
+  }
+
+  /** Text for the Rule column: the rule number, or "Default". */
+  function ruleColumnText(ruleIndex) {
+    return ruleIndex === -1 ? DEFAULT_RULE_LABEL : String(ruleIndex + 1);
+  }
+
+  /**
+   * Turn the fields, combinations and results into a grid of strings:
+   * the first row is the header, every following row is one combination.
+   */
+  function buildTableGrid(activeFields, combinationList, decisionList, columnOptions) {
+    const tableGrid = [buildHeaderLabels(activeFields, columnOptions)];
+    combinationList.forEach((combination, rowIndex) => {
+      const bodyCells = [];
+      if (columnOptions.showRowNumber) bodyCells.push(String(rowIndex + 1));
+      if (columnOptions.showBitPattern) bodyCells.push(combination.bitPattern);
+      activeFields.forEach((field, fieldPosition) => {
+        bodyCells.push(combination.usesStateB[fieldPosition] ? field.stateB : field.stateA);
+      });
+      bodyCells.push(decisionList[rowIndex].result);
+      if (columnOptions.showRuleColumn) bodyCells.push(ruleColumnText(decisionList[rowIndex].ruleIndex));
+      // Empty note cell, to be filled in after pasting.
+      if (columnOptions.showNoteColumn) bodyCells.push('');
+      tableGrid.push(bodyCells);
+    });
+    return tableGrid;
+  }
+
+  /** Markdown table: pipe-separated rows with a --- separator under the header. */
+  function gridToMarkdown(tableGrid) {
+    const [headerCells, ...bodyRows] = tableGrid;
+    const toMarkdownLine = (rowCells) => '| ' + rowCells.map(escapeMarkdownCell).join(' | ') + ' |';
+    return [
+      toMarkdownLine(headerCells),
+      '| ' + headerCells.map(() => '---').join(' | ') + ' |',
+      ...bodyRows.map(toMarkdownLine),
+    ].join('\n');
+  }
+
+  /**
+   * Tab-separated text: Excel puts each tab-separated value in its own cell.
+   * Bit patterns like "010" would lose their leading zero in Excel, so that
+   * column is written as ="010", which Excel shows as the text 010.
+   */
+  function gridToTabSeparated(tableGrid, keepTextColumnIndex) {
+    return tableGrid
+      .map((rowCells, rowIndex) => rowCells
+        .map((cellText, columnIndex) => {
+          const cleanText = cellText.replace(/[\t\r\n]+/g, ' ');
+          // Keep leading zeros in the bit pattern column (body rows only).
+          return rowIndex > 0 && columnIndex === keepTextColumnIndex ? `="${cleanText}"` : cleanText;
+        })
+        .join('\t'))
+      .join('\r\n');
+  }
+
+  /** Escape text for use inside HTML markup. */
+  function escapeHtml(rawText) {
+    return rawText
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /**
+   * HTML table with simple inline borders. Word and Excel both paste this as a
+   * real table. mso-number-format keeps "010" as text in Excel.
+   */
+  function gridToHtmlTable(tableGrid) {
+    const cellStyle = 'border:1px solid #999;padding:4px 8px;mso-number-format:\'\\@\';';
+    const [headerCells, ...bodyRows] = tableGrid;
+    const headerHtml = '<tr>' + headerCells
+      .map((cellText) => `<th style="${cellStyle}background:#eee;text-align:left;">${escapeHtml(cellText)}</th>`)
+      .join('') + '</tr>';
+    const bodyHtml = bodyRows
+      .map((rowCells) => '<tr>' + rowCells
+        .map((cellText) => `<td style="${cellStyle}">${escapeHtml(cellText)}</td>`)
+        .join('') + '</tr>')
+      .join('');
+    return `<table style="border-collapse:collapse;"><thead>${headerHtml}</thead><tbody>${bodyHtml}</tbody></table>`;
+  }
+
+  /** Render the preview table with DOM nodes (textContent keeps it safe from HTML in names). */
+  function renderPreview(activeFields, combinationList, decisionList, columnOptions) {
+    previewTable.replaceChildren();
+    if (activeFields.length === 0) return;
+
+    // Header row
+    const headerRow = previewTable.createTHead().insertRow();
+    buildHeaderLabels(activeFields, columnOptions).forEach((headerLabel) => {
+      const headerCell = document.createElement('th');
+      headerCell.textContent = headerLabel;
+      headerRow.appendChild(headerCell);
+    });
+
+    // One body row per combination; states coloured A/B, rule results highlighted.
+    const tableBody = previewTable.createTBody();
+    combinationList.forEach((combination, rowIndex) => {
+      const bodyRow = tableBody.insertRow();
+      const decision = decisionList[rowIndex];
+      if (columnOptions.showRowNumber) bodyRow.insertCell().textContent = String(rowIndex + 1);
+      if (columnOptions.showBitPattern) {
+        const bitCell = bodyRow.insertCell();
+        bitCell.textContent = combination.bitPattern;
+        bitCell.className = 'bit-pattern';
+      }
+      activeFields.forEach((field, fieldPosition) => {
+        const stateCell = bodyRow.insertCell();
+        const usesStateB = combination.usesStateB[fieldPosition];
+        stateCell.textContent = usesStateB ? field.stateB : field.stateA;
+        stateCell.className = usesStateB ? 'state-b' : 'state-a';
+      });
+      const resultCell = bodyRow.insertCell();
+      resultCell.textContent = decision.result;
+      resultCell.className = decision.ruleIndex === -1 ? 'default-result' : 'rule-result';
+      if (columnOptions.showRuleColumn) {
+        const ruleCell = bodyRow.insertCell();
+        ruleCell.textContent = ruleColumnText(decision.ruleIndex);
+        ruleCell.className = 'rule-number';
+      }
+      // Empty note cell at the end of the row.
+      if (columnOptions.showNoteColumn) bodyRow.insertCell();
+    });
+  }
+
+  /** Plain-language summary of a rule, e.g. "If Firstname is No → Error". */
+  function describeRule(rule, activeFields) {
+    const conditionTexts = activeFields
+      .filter((field) => rule.conditionByFieldId[field.id])
+      .map((field) => `${field.name} is ${rule.conditionByFieldId[field.id] === 'B' ? field.stateB : field.stateA}`);
+    const resultText = rule.result.trim() || '(empty result)';
+    if (conditionTexts.length === 0) return `Not used yet → ${resultText}`;
+    return `If ${conditionTexts.join(' and ')} → ${resultText}`;
+  }
+
+  /**
+   * Update each rule card's status line: how many rows it decides, or a
+   * warning when it never wins (earlier rules already cover its rows).
+   */
+  function updateRuleStatuses(activeFields, combinationList, decisionList) {
+    ruleList.forEach((rule, ruleIndex) => {
+      const statusElement = ruleStatusElements[ruleIndex];
+      const summaryElement = ruleSummaryElements[ruleIndex];
+      if (!statusElement || !summaryElement) return;
+
+      summaryElement.textContent = describeRule(rule, activeFields);
+
+      const matchedRowCount = combinationList
+        .filter((combination) => ruleMatchesCombination(rule, activeFields, combination)).length;
+      const decidedRowCount = decisionList.filter((decision) => decision.ruleIndex === ruleIndex).length;
+
+      let statusText;
+      let isWarning = false;
+      if (combinationList.length === 0) {
+        statusText = '';
+      } else if (!ruleHasConditions(rule, activeFields)) {
+        statusText = 'Pick at least one state to use this rule';
+        isWarning = true;
+      } else if (decidedRowCount === 0) {
+        statusText = 'Never used: rules above already decide all its rows';
+        isWarning = true;
+      } else if (decidedRowCount < matchedRowCount) {
+        statusText = `${decidedRowCount} of ${matchedRowCount} matching rows (rules above take the rest)`;
+      } else {
+        statusText = `${decidedRowCount} ${decidedRowCount === 1 ? 'row' : 'rows'}`;
+      }
+      statusElement.textContent = statusText;
+      statusElement.classList.toggle('warning', isWarning);
+    });
+  }
+
+  /** "OK: 4 rows · Error: name missing: 4 rows" for the table section. */
+  function buildResultSummary(decisionList) {
+    const rowCountByResult = new Map();
+    decisionList.forEach((decision) => {
+      const resultLabel = decision.result || '(empty)';
+      rowCountByResult.set(resultLabel, (rowCountByResult.get(resultLabel) || 0) + 1);
+    });
+    return [...rowCountByResult]
+      .map(([resultLabel, rowCount]) => `${resultLabel}: ${rowCount} ${rowCount === 1 ? 'row' : 'rows'}`)
+      .join(' · ');
+  }
+
+  /**
+   * Encode only the characters that would break the query string (% & = # +),
+   * plus any extra characters the caller needs kept apart (commas, rule separators).
+   * Spaces stay as plain spaces so the link is readable.
+   */
+  function encodeQueryPart(rawText, extraCharacters = '') {
+    let encodedText = rawText
+      .replace(/%/g, '%25').replace(/&/g, '%26').replace(/=/g, '%3D')
+      .replace(/#/g, '%23').replace(/\+/g, '%2B');
+    for (const extraCharacter of extraCharacters) {
+      const percentCode = '%' + extraCharacter.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0');
+      encodedText = encodedText.split(extraCharacter).join(percentCode);
+    }
+    return encodedText;
+  }
+
+  /**
+   * Build this page's address with the current fields, rules and default, e.g.
+   *   ?Firstname=Yes,No&Address=Yes,No&_rule=Firstname:No=Missing name&_default=OK
+   * In a rule, conditions are "Field:State" joined with ";", then "=" and the result.
+   * ("=" is used because browsers percent-encode ">" in addresses.)
+   */
+  function buildPageLink(activeFields) {
+    const pageAddress = window.location.href.split(/[?#]/)[0];
+    const queryPairs = activeFields.map((field) =>
+      `${encodeQueryPart(field.name)}=${encodeQueryPart(field.stateA, ',')},${encodeQueryPart(field.stateB)}`);
+
+    ruleList.forEach((rule) => {
+      const conditionParts = activeFields
+        .filter((field) => rule.conditionByFieldId[field.id])
+        .map((field) => {
+          const stateText = rule.conditionByFieldId[field.id] === 'B' ? field.stateB : field.stateA;
+          return `${encodeQueryPart(field.name, ':;')}:${encodeQueryPart(stateText, ';')}`;
+        });
+      queryPairs.push(`${RULE_QUERY_NAME}=${conditionParts.join(';')}=${encodeQueryPart(rule.result.trim())}`);
+    });
+
+    if (defaultResult.trim() !== '') {
+      queryPairs.push(`${DEFAULT_QUERY_NAME}=${encodeQueryPart(defaultResult.trim())}`);
+    }
+    return queryPairs.length ? `${pageAddress}?${queryPairs.join('&')}` : pageAddress;
+  }
+
+  /** Read the column checkboxes into one options object. */
+  function getColumnOptions() {
+    return {
+      showRowNumber: includeRowNumberCheckbox.checked,
+      showBitPattern: includeBitPatternCheckbox.checked,
+      showRuleColumn: includeRuleColumnCheckbox.checked,
+      showNoteColumn: includeNoteColumnCheckbox.checked,
+    };
+  }
+
+  /** Recalculate results, preview, rule statuses and link from the current state. */
+  function refreshOutput() {
+    const activeFields = getActiveFields();
+    const columnOptions = getColumnOptions();
+    const combinationList = activeFields.length ? buildCombinations(activeFields) : [];
+    const decisionList = decideResults(activeFields, combinationList);
+
+    currentTableGrid = activeFields.length
+      ? buildTableGrid(activeFields, combinationList, decisionList, columnOptions)
+      : [];
+    renderPreview(activeFields, combinationList, decisionList, columnOptions);
+    updateRuleStatuses(activeFields, combinationList, decisionList);
+
+    // Nothing to copy without fields.
+    emptyMessage.hidden = activeFields.length > 0;
+    resultSummary.hidden = activeFields.length === 0;
+    resultSummary.textContent = buildResultSummary(decisionList);
+    copyButtons.forEach((copyButton) => { copyButton.disabled = activeFields.length === 0; });
+
+    pageLinkOutput.value = buildPageLink(activeFields);
+    linkCopyStatus.textContent = '';
+
+    fieldCountLabel.textContent = `${activeFields.length} of ${MAX_FIELD_COUNT} fields, ${combinationList.length} rows`;
+    addFieldButton.disabled = fieldList.length >= MAX_FIELD_COUNT;
+    copyStatus.textContent = '';
+  }
+
+  /** Create one text input bound to a property of a field. */
+  function createFieldInput(fieldIndex, propertyName, placeholderText, accessibleLabel) {
+    const textInput = document.createElement('input');
+    textInput.type = 'text';
+    textInput.id = `${propertyName}-${fieldIndex}`;
+    textInput.value = fieldList[fieldIndex][propertyName];
+    textInput.placeholder = placeholderText;
+    textInput.setAttribute('aria-label', accessibleLabel);
+    textInput.addEventListener('input', () => {
+      fieldList[fieldIndex][propertyName] = textInput.value;
+      // Field names and states appear in the rule dropdowns, so rebuild those too.
+      renderRuleEditor();
+      refreshOutput();
+    });
+    return textInput;
+  }
+
+  /** Rebuild the field editor rows (called when fields are added or removed). */
+  function renderFieldEditor() {
+    fieldGrid.replaceChildren();
+
+    // Column headings
+    ['', 'Field name', 'State A', 'State B', ''].forEach((headingText) => {
+      const headingCell = document.createElement('span');
+      headingCell.className = 'column-label header-cell';
+      headingCell.textContent = headingText;
+      fieldGrid.appendChild(headingCell);
+    });
+
+    fieldList.forEach((field, fieldIndex) => {
+      const fieldNumber = fieldIndex + 1;
+
+      const bitNumber = document.createElement('span');
+      bitNumber.className = 'bit-number';
+      bitNumber.textContent = String(fieldNumber);
+
+      const nameInput = createFieldInput(fieldIndex, 'name', 'e.g. Firstname', `Name of field ${fieldNumber}`);
+      nameInput.classList.add('field-name-input');
+      const stateAInput = createFieldInput(fieldIndex, 'stateA', DEFAULT_STATE_A, `State A for field ${fieldNumber}`);
+      const stateBInput = createFieldInput(fieldIndex, 'stateB', DEFAULT_STATE_B, `State B for field ${fieldNumber}`);
+      // Classes used by the phone layout to place the state boxes on the second line.
+      stateAInput.classList.add('state-a-input');
+      stateBInput.classList.add('state-b-input');
+
+      const removeButton = document.createElement('button');
+      removeButton.type = 'button';
+      removeButton.className = 'remove-button';
+      removeButton.textContent = '✕';
+      removeButton.setAttribute('aria-label', `Remove field ${fieldNumber}`);
+      removeButton.addEventListener('click', () => {
+        // Drop the field and any rule conditions that pointed at it.
+        const [removedField] = fieldList.splice(fieldIndex, 1);
+        ruleList.forEach((rule) => { delete rule.conditionByFieldId[removedField.id]; });
+        renderFieldEditor();
+        renderRuleEditor();
+        refreshOutput();
+      });
+
+      fieldGrid.append(bitNumber, nameInput, stateAInput, stateBInput, removeButton);
+    });
+  }
+
+  /** Small icon button used for move up / move down / remove on rule cards. */
+  function createSmallButton(buttonText, accessibleLabel, isDisabled, clickHandler) {
+    const smallButton = document.createElement('button');
+    smallButton.type = 'button';
+    smallButton.className = 'small-button';
+    smallButton.textContent = buttonText;
+    smallButton.setAttribute('aria-label', accessibleLabel);
+    smallButton.disabled = isDisabled;
+    smallButton.addEventListener('click', clickHandler);
+    return smallButton;
+  }
+
+  /** Move a rule up or down one place (order matters: first match wins). */
+  function moveRule(ruleIndex, moveDirection) {
+    const targetIndex = ruleIndex + moveDirection;
+    if (targetIndex < 0 || targetIndex >= ruleList.length) return;
+    [ruleList[ruleIndex], ruleList[targetIndex]] = [ruleList[targetIndex], ruleList[ruleIndex]];
+    renderRuleEditor();
+    refreshOutput();
+  }
+
+  /**
+   * Rebuild the rule cards. Each card has a dropdown per named field
+   * (Any / state A / state B), a result box, a plain-language summary and a
+   * status line that refreshOutput() fills in.
+   */
+  function renderRuleEditor() {
+    ruleListElement.replaceChildren();
+    ruleStatusElements = [];
+    ruleSummaryElements = [];
+    const activeFields = getActiveFields();
+
+    ruleList.forEach((rule, ruleIndex) => {
+      const ruleNumber = ruleIndex + 1;
+      const ruleCard = document.createElement('div');
+      ruleCard.className = 'rule-card';
+
+      // Header: "Rule 1", status, and move / remove buttons.
+      const cardHeader = document.createElement('div');
+      cardHeader.className = 'rule-card-header';
+      const ruleTitle = document.createElement('span');
+      ruleTitle.className = 'rule-title';
+      ruleTitle.textContent = `Rule ${ruleNumber}`;
+      const ruleStatus = document.createElement('span');
+      ruleStatus.className = 'rule-status';
+      const ruleButtons = document.createElement('div');
+      ruleButtons.className = 'rule-buttons';
+      ruleButtons.append(
+        createSmallButton('↑', `Move rule ${ruleNumber} up`, ruleIndex === 0, () => moveRule(ruleIndex, -1)),
+        createSmallButton('↓', `Move rule ${ruleNumber} down`, ruleIndex === ruleList.length - 1, () => moveRule(ruleIndex, 1)),
+        createSmallButton('✕', `Remove rule ${ruleNumber}`, false, () => {
+          ruleList.splice(ruleIndex, 1);
+          renderRuleEditor();
+          refreshOutput();
+        }),
+      );
+      cardHeader.append(ruleTitle, ruleStatus, ruleButtons);
+
+      // One dropdown per named field.
+      const conditionGrid = document.createElement('div');
+      conditionGrid.className = 'condition-grid';
+      activeFields.forEach((field) => {
+        const conditionLabel = document.createElement('label');
+        conditionLabel.className = 'labelled-control';
+        const labelText = document.createElement('span');
+        labelText.textContent = field.name;
+
+        const conditionSelect = document.createElement('select');
+        [['', 'Any'], ['A', field.stateA], ['B', field.stateB]].forEach(([optionValue, optionText]) => {
+          conditionSelect.add(new Option(optionText, optionValue));
+        });
+        conditionSelect.value = rule.conditionByFieldId[field.id] || '';
+        conditionSelect.classList.toggle('condition-set', conditionSelect.value !== '');
+        conditionSelect.addEventListener('change', () => {
+          if (conditionSelect.value === '') delete rule.conditionByFieldId[field.id];
+          else rule.conditionByFieldId[field.id] = conditionSelect.value;
+          conditionSelect.classList.toggle('condition-set', conditionSelect.value !== '');
+          refreshOutput();
+        });
+
+        conditionLabel.append(labelText, conditionSelect);
+        conditionGrid.appendChild(conditionLabel);
+      });
+
+      // Result box.
+      const resultLabel = document.createElement('label');
+      resultLabel.className = 'labelled-control';
+      const resultLabelText = document.createElement('span');
+      resultLabelText.textContent = 'Then the expected result is';
+      const resultInput = document.createElement('input');
+      resultInput.type = 'text';
+      resultInput.value = rule.result;
+      resultInput.placeholder = 'e.g. Error';
+      resultInput.dataset.ruleIndex = String(ruleIndex);
+      resultInput.addEventListener('input', () => {
+        rule.result = resultInput.value;
+        refreshOutput();
+      });
+      resultLabel.append(resultLabelText, resultInput);
+
+      // Plain-language summary of the rule.
+      const ruleSummary = document.createElement('p');
+      ruleSummary.className = 'rule-summary';
+
+      ruleCard.append(cardHeader, conditionGrid, resultLabel, ruleSummary);
+      ruleListElement.appendChild(ruleCard);
+      ruleStatusElements.push(ruleStatus);
+      ruleSummaryElements.push(ruleSummary);
+    });
+  }
+
+  // Add an empty field (up to the maximum) and focus its name box.
+  addFieldButton.addEventListener('click', () => {
+    if (fieldList.length >= MAX_FIELD_COUNT) return;
+    fieldList.push(createField('', '', ''));
+    renderFieldEditor();
+    renderRuleEditor();
+    refreshOutput();
+    document.getElementById(`name-${fieldList.length - 1}`).focus();
+  });
+
+  // Add an empty rule at the bottom and focus its first dropdown.
+  addRuleButton.addEventListener('click', () => {
+    ruleList.push({ conditionByFieldId: {}, result: '' });
+    renderRuleEditor();
+    refreshOutput();
+    const newRuleCard = ruleListElement.lastElementChild;
+    const firstControl = newRuleCard && newRuleCard.querySelector('select, input');
+    if (firstControl) firstControl.focus();
+  });
+
+  defaultResultInput.addEventListener('input', () => {
+    defaultResult = defaultResultInput.value;
+    refreshOutput();
+  });
+
+  [includeRowNumberCheckbox, includeBitPatternCheckbox, includeRuleColumnCheckbox, includeNoteColumnCheckbox]
+    .forEach((columnCheckbox) => columnCheckbox.addEventListener('change', refreshOutput));
+
+  /**
+   * Fallback copy using the older copy command. A one-off 'copy' listener puts
+   * both the plain text and the HTML version on the clipboard.
+   */
+  function copyWithCopyCommand(plainText, htmlText) {
+    const fillClipboard = (copyEvent) => {
+      copyEvent.clipboardData.setData('text/plain', plainText);
+      if (htmlText) copyEvent.clipboardData.setData('text/html', htmlText);
+      copyEvent.preventDefault();
+    };
+    document.addEventListener('copy', fillClipboard, { once: true });
+    const copySucceeded = document.execCommand('copy');
+    document.removeEventListener('copy', fillClipboard);
+    return copySucceeded;
+  }
+
+  /**
+   * Put text (and optionally HTML) on the clipboard.
+   * Tries the modern Clipboard API first, then falls back to the copy command.
+   */
+  async function writeToClipboard(plainText, htmlText) {
+    try {
+      if (htmlText && window.ClipboardItem) {
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/plain': new Blob([plainText], { type: 'text/plain' }),
+          'text/html': new Blob([htmlText], { type: 'text/html' }),
+        })]);
+      } else {
+        await navigator.clipboard.writeText(plainText);
+      }
+      return true;
+    } catch (clipboardError) {
+      return copyWithCopyCommand(plainText, htmlText);
+    }
+  }
+
+  // Which column (if any) holds the bit pattern, so Excel keeps its leading zeros.
+  function getBitPatternColumnIndex() {
+    if (!includeBitPatternCheckbox.checked) return -1;
+    return includeRowNumberCheckbox.checked ? 1 : 0;
+  }
+
+  // One handler for all three copy buttons; the data attribute picks the format.
+  copyButtons.forEach((copyButton) => {
+    copyButton.addEventListener('click', async () => {
+      const copyFormat = copyButton.dataset.copyFormat;
+      let plainText;
+      let htmlText = null;
+
+      if (copyFormat === 'markdown') {
+        // Markdown is plain text only.
+        plainText = gridToMarkdown(currentTableGrid);
+      } else if (copyFormat === 'excel') {
+        // Excel reads tab-separated text cell by cell; HTML is added for formatting.
+        plainText = gridToTabSeparated(currentTableGrid, getBitPatternColumnIndex());
+        htmlText = gridToHtmlTable(currentTableGrid);
+      } else {
+        // Word pastes the HTML as a real table; tab-separated text is the fallback.
+        plainText = gridToTabSeparated(currentTableGrid, -1);
+        htmlText = gridToHtmlTable(currentTableGrid);
+      }
+
+      const copySucceeded = await writeToClipboard(plainText, htmlText);
+      copyStatus.textContent = copySucceeded
+        ? `Copied for ${copyButton.textContent.replace(/^Copy (as |for )/, '')}`
+        : 'Your browser blocked the clipboard. Try again in another browser.';
+    });
+  });
+
+  // Turn + into a space, then decode %20 and other escapes; keep raw text if decoding fails.
+  function decodeQueryPart(queryPart) {
+    const withSpaces = queryPart.replace(/\+/g, ' ');
+    try { return decodeURIComponent(withSpaces); } catch (decodeError) { return withSpaces; }
+  }
+
+  /**
+   * Read fields, rules and the default result from the query string, e.g.
+   *   ?Firstname=Yes,No&Address=Yes,No&_rule=Firstname:No=Missing name&_default=OK
+   * Field parameters work like in the bitwise table ("State A,State B", Yes/No
+   * when left out). A rule is "Field:State;Field:State=Result"; field names and
+   * states are matched without caring about upper/lower case, and conditions
+   * that do not match a field or state are skipped.
+   * Returns null when there is nothing to read.
+   */
+  function readStateFromQueryString() {
+    const rawQuery = window.location.search.replace(/^\?/, '');
+    if (rawQuery.trim() === '') return null;
+
+    const queryFields = [];
+    const rawRuleValues = [];
+    let queryDefaultResult = null;
+
+    rawQuery.split('&').forEach((queryPair) => {
+      if (queryPair === '') return;
+      const equalsPosition = queryPair.indexOf('=');
+      const rawName = equalsPosition === -1 ? queryPair : queryPair.slice(0, equalsPosition);
+      const rawValue = equalsPosition === -1 ? '' : queryPair.slice(equalsPosition + 1);
+      const parameterName = decodeQueryPart(rawName).trim();
+
+      // Rules are parsed after all fields are known; keep the raw (undecoded) value.
+      if (parameterName === RULE_QUERY_NAME) { rawRuleValues.push(rawValue); return; }
+      if (parameterName === DEFAULT_QUERY_NAME) { queryDefaultResult = decodeQueryPart(rawValue).trim(); return; }
+      if (parameterName === '' || queryFields.length >= MAX_FIELD_COUNT) return;
+
+      // Split on the first comma only, so state B may itself contain commas.
+      const decodedStates = decodeQueryPart(rawValue);
+      const commaPosition = decodedStates.indexOf(',');
+      const stateA = commaPosition === -1 ? decodedStates : decodedStates.slice(0, commaPosition);
+      const stateB = commaPosition === -1 ? '' : decodedStates.slice(commaPosition + 1);
+      queryFields.push(createField(parameterName, stateA.trim(), stateB.trim()));
+    });
+
+    // Compare names and states without caring about case or extra spaces.
+    const normalise = (text) => text.trim().toLowerCase();
+
+    // Now that the fields exist, turn each raw rule into conditions by field id.
+    // Separators are split before decoding, so encoded ";", ":" and "=" stay as text.
+    const queryRules = rawRuleValues.map((rawRuleValue) => {
+      // The first raw "=" separates the conditions from the result.
+      const resultSeparatorPosition = rawRuleValue.indexOf('=');
+      const rawConditions = resultSeparatorPosition === -1 ? '' : rawRuleValue.slice(0, resultSeparatorPosition);
+      const rawResult = resultSeparatorPosition === -1 ? rawRuleValue : rawRuleValue.slice(resultSeparatorPosition + 1);
+      const conditionByFieldId = {};
+
+      rawConditions.split(';').forEach((rawCondition) => {
+        const colonPosition = rawCondition.indexOf(':');
+        if (colonPosition === -1) return;
+        const conditionFieldName = normalise(decodeQueryPart(rawCondition.slice(0, colonPosition)));
+        const conditionState = normalise(decodeQueryPart(rawCondition.slice(colonPosition + 1)));
+        const matchingField = queryFields.find((field) => normalise(field.name) === conditionFieldName);
+        if (!matchingField) return;
+        if (conditionState === normalise(matchingField.stateA || DEFAULT_STATE_A)) conditionByFieldId[matchingField.id] = 'A';
+        else if (conditionState === normalise(matchingField.stateB || DEFAULT_STATE_B)) conditionByFieldId[matchingField.id] = 'B';
+      });
+      return { conditionByFieldId, result: decodeQueryPart(rawResult).trim() };
+    });
+
+    if (queryFields.length === 0) return null;
+    return { queryFields, queryRules, queryDefaultResult };
+  }
+
+  // Copy the link as plain text, with spaces kept as spaces.
+  copyLinkButton.addEventListener('click', async () => {
+    const copySucceeded = await writeToClipboard(pageLinkOutput.value, null);
+    if (!copySucceeded) pageLinkOutput.select();
+    linkCopyStatus.textContent = copySucceeded ? 'Copied' : 'Selected. Press Ctrl+C to copy.';
+  });
+
+  // Fields and rules from the address replace the built-in example.
+  const stateFromQueryString = readStateFromQueryString();
+  if (stateFromQueryString) {
+    fieldList = stateFromQueryString.queryFields;
+    ruleList = stateFromQueryString.queryRules;
+    defaultResult = stateFromQueryString.queryDefaultResult ?? '';
+  }
+  defaultResultInput.value = defaultResult;
+
+  // First render
+  renderFieldEditor();
+  renderRuleEditor();
+  refreshOutput();
+</script>
+
+</body>
+</html>
