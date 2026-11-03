@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{margin:0}</style>
+<title>Table converter</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: one centred column; input on top, preview and output below. */
+  :root {
+    --page-background: #f3f5f8;
+    --panel-background: #ffffff;
+    --text-color: #1b2230;
+    --muted-text-color: #5b6477;
+    --border-color: #d6dbe4;
+    --accent-color: #2457d6;
+    --accent-text-color: #ffffff;
+    --header-background: #eef1f6;
+    --warning-color: #a3460f;
+    --body-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono-font: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page-background: #13161c;
+      --panel-background: #1c2028;
+      --text-color: #e5e8ee;
+      --muted-text-color: #98a1b3;
+      --border-color: #323947;
+      --accent-color: #7ea1ff;
+      --accent-text-color: #0f1420;
+      --header-background: #252b36;
+      --warning-color: #f0a46e;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page-background: #13161c;
+    --panel-background: #1c2028;
+    --text-color: #e5e8ee;
+    --muted-text-color: #98a1b3;
+    --border-color: #323947;
+    --accent-color: #7ea1ff;
+    --accent-text-color: #0f1420;
+    --header-background: #252b36;
+    --warning-color: #f0a46e;
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--page-background);
+    color: var(--text-color);
+    font-family: var(--body-font);
+    font-size: 15px;
+  }
+  main {
+    max-width: 920px;
+    margin: 0 auto;
+    padding-block: 24px 40px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: grid;
+    gap: 18px;
+  }
+  h1 { margin: 0; font-size: 24px; text-wrap: balance; }
+  h2 { margin: 0; font-size: 16px; }
+  .intro { margin: 6px 0 0; color: var(--muted-text-color); max-width: 65ch; }
+
+  section {
+    background: var(--panel-background);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 0;
+    display: grid;
+    gap: 12px;
+  }
+  .section-header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+
+  input:focus-visible, button:focus-visible, textarea:focus-visible, select:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 1px; }
+
+  button {
+    padding: 8px 14px;
+    border: 1px solid var(--accent-color);
+    border-radius: 5px;
+    background: var(--accent-color);
+    color: var(--accent-text-color);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--accent-color); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  select {
+    padding: 6px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background: var(--page-background);
+    color: var(--text-color);
+    font: inherit;
+  }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .options { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+  .options label { display: inline-flex; gap: 6px; align-items: center; }
+  .muted { color: var(--muted-text-color); font-variant-numeric: tabular-nums; }
+  .warning { color: var(--warning-color); }
+
+  textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 180px;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background: var(--page-background);
+    color: var(--text-color);
+    font-family: var(--mono-font);
+    font-size: 13px;
+    white-space: pre;
+    overflow-x: auto;
+    resize: vertical;
+    tab-size: 8;
+  }
+
+  /* Preview table scrolls inside its own box on narrow screens. */
+  .table-scroller { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* max-content stops the table squeezing its last columns on a phone; it scrolls instead.
+     Cells only break where the pasted text has a line break. */
+  table { border-collapse: collapse; font-variant-numeric: tabular-nums; width: max-content; }
+  th, td { border: 1px solid var(--border-color); padding: 5px 10px; text-align: left; white-space: pre; vertical-align: top; }
+  th { font-size: 13px; background: var(--header-background); }
+
+  /* Copy buttons sit in one row on wide screens. */
+  .copy-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  /* Phone width: bigger text in form controls (stops iOS from zooming in),
+     and the copy buttons become an even two-column grid. */
+  @media (max-width: 560px) {
+    main { padding-block: 16px 32px; gap: 14px; }
+    h1 { font-size: 21px; }
+    section { padding: 12px; }
+    textarea, select { font-size: 16px; }
+    textarea { min-height: 150px; }
+    .copy-buttons { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+    .copy-buttons button { padding: 11px 8px; }
+    .section-header > .actions { width: 100%; }
+    th, td { padding: 5px 8px; }
+  }
+</style>
+
+</head><body>
+<main>
+  <header>
+    <h1>Table converter</h1>
+    <p class="intro">Paste a table as Markdown, CSV or straight from Excel or Word. The format is detected for you. Check the preview, then copy it out as Markdown, CSV, Excel or Word.</p>
+  </header>
+
+  <!-- Input: pasted table text and parsing options -->
+  <section aria-labelledby="inputHeading">
+    <div class="section-header">
+      <h2 id="inputHeading">Paste a table</h2>
+      <span class="muted" id="detectedFormatLabel" aria-live="polite"></span>
+    </div>
+    <textarea id="tableInput" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Table to convert"></textarea>
+    <div class="options">
+      <label>Read as
+        <select id="inputFormatSelect">
+          <option value="auto">Detect automatically</option>
+          <option value="markdown">Markdown</option>
+          <option value="csv">CSV</option>
+          <option value="tsv">Tab-separated (Excel)</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="firstRowIsHeader" checked> First row is the header</label>
+      <label><input type="checkbox" id="trimCells" checked> Trim spaces</label>
+      <label><input type="checkbox" id="swapRowsAndColumns"> Swap rows and columns</label>
+      <button type="button" class="secondary" id="clearInputButton">Clear</button>
+    </div>
+  </section>
+
+  <!-- Preview of the parsed table with the copy buttons -->
+  <section aria-labelledby="previewHeading">
+    <div class="section-header">
+      <h2 id="previewHeading">Preview</h2>
+      <span class="muted" id="tableSizeLabel"></span>
+    </div>
+    <div class="actions">
+      <div class="copy-buttons">
+        <button type="button" data-copy-format="markdown">Copy as Markdown</button>
+        <button type="button" data-copy-format="csv">Copy as CSV</button>
+        <button type="button" data-copy-format="excel">Copy for Excel</button>
+        <button type="button" data-copy-format="word">Copy for Word</button>
+      </div>
+      <span class="muted" id="copyStatus" aria-live="polite"></span>
+    </div>
+    <p class="muted" id="emptyMessage" hidden>Paste a table above to see it here.</p>
+    <p class="warning" id="raggedRowsMessage" hidden></p>
+    <div class="table-scroller"><table id="previewTable"></table></div>
+  </section>
+
+  <!-- Converted text, for reading or selecting by hand -->
+  <section aria-labelledby="outputHeading">
+    <div class="section-header">
+      <h2 id="outputHeading">Converted text</h2>
+      <div class="options">
+        <label>Show as
+          <select id="outputFormatSelect">
+            <option value="markdown">Markdown</option>
+            <option value="csv">CSV</option>
+            <option value="tsv">Tab-separated</option>
+          </select>
+        </label>
+        <label>CSV separator
+          <select id="csvSeparatorSelect">
+            <option value=",">Comma ,</option>
+            <option value=";">Semicolon ;</option>
+          </select>
+        </label>
+        <label><input type="checkbox" id="alignMarkdownColumns" checked> Line up Markdown columns</label>
+      </div>
+    </div>
+    <textarea id="convertedOutput" readonly spellcheck="false" aria-label="Converted table text"></textarea>
+  </section>
+</main>
+
+<script>
+  // Shown in the input box on first load, so the page is not empty.
+  const EXAMPLE_TABLE = [
+    '| Name | Role | Started |',
+    '| --- | --- | --- |',
+    '| Anna | Developer | 2021 |',
+    '| Erik | Tester | 2023 |',
+  ].join('\n');
+
+  // Display names for each input format, used in the "Detected" label.
+  const FORMAT_NAMES = {
+    markdown: 'Markdown',
+    csv: 'CSV',
+    tsv: 'Tab-separated',
+  };
+
+  // Page elements we read from or write to.
+  const tableInput = document.getElementById('tableInput');
+  const inputFormatSelect = document.getElementById('inputFormatSelect');
+  const firstRowIsHeaderCheckbox = document.getElementById('firstRowIsHeader');
+  const trimCellsCheckbox = document.getElementById('trimCells');
+  const swapRowsAndColumnsCheckbox = document.getElementById('swapRowsAndColumns');
+  const clearInputButton = document.getElementById('clearInputButton');
+  const detectedFormatLabel = document.getElementById('detectedFormatLabel');
+  const tableSizeLabel = document.getElementById('tableSizeLabel');
+  const previewTable = document.getElementById('previewTable');
+  const emptyMessage = document.getElementById('emptyMessage');
+  const raggedRowsMessage = document.getElementById('raggedRowsMessage');
+  const copyButtons = document.querySelectorAll('[data-copy-format]');
+  const copyStatus = document.getElementById('copyStatus');
+  const outputFormatSelect = document.getElementById('outputFormatSelect');
+  const csvSeparatorSelect = document.getElementById('csvSeparatorSelect');
+  const alignMarkdownColumnsCheckbox = document.getElementById('alignMarkdownColumns');
+  const convertedOutput = document.getElementById('convertedOutput');
+
+  // The parsed table as a grid of strings (first row is the header when that
+  // option is on). Every output format is generated from this.
+  let currentTableGrid = [];
+
+  /* ------------------------------------------------------------------ */
+  /* Reading input                                                       */
+  /* ------------------------------------------------------------------ */
+
+  /** A Markdown separator line looks like | --- | :---: | ---: | */
+  function isMarkdownSeparatorLine(lineText) {
+    return /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/.test(lineText) && lineText.includes('-');
+  }
+
+  /**
+   * Count how often a separator character appears in a line, ignoring any
+   * inside double quotes (so "Smith, John" counts as no commas).
+   */
+  function countSeparatorOutsideQuotes(lineText, separatorCharacter) {
+    let separatorCount = 0;
+    let insideQuotes = false;
+    for (const character of lineText) {
+      if (character === '"') insideQuotes = !insideQuotes;
+      else if (character === separatorCharacter && !insideQuotes) separatorCount++;
+    }
+    return separatorCount;
+  }
+
+  /**
+   * Guess the format from the text.
+   * Returns { format: 'markdown' | 'csv' | 'tsv', csvSeparator }.
+   *  - Markdown: lines with pipes and a --- separator line, or every line wrapped in pipes.
+   *  - Tab-separated: the first line has a tab (this is what Excel puts on the clipboard).
+   *  - CSV otherwise; semicolon wins over comma when the first line has more of them
+   *    (Excel in Swedish and other European settings saves CSV with semicolons).
+   */
+  function detectFormat(rawText) {
+    const nonEmptyLines = rawText.split(/\r?\n/).filter((lineText) => lineText.trim() !== '');
+    const firstLine = nonEmptyLines[0] || '';
+
+    const pipeLines = nonEmptyLines.filter((lineText) => lineText.includes('|'));
+    const hasSeparatorLine = nonEmptyLines.some(isMarkdownSeparatorLine);
+    const allLinesWrappedInPipes = nonEmptyLines.length > 0 &&
+      nonEmptyLines.every((lineText) => /^\s*\|.*\|\s*$/.test(lineText));
+    if ((hasSeparatorLine && pipeLines.length >= 2) || allLinesWrappedInPipes) {
+      return { format: 'markdown', csvSeparator: ',' };
+    }
+
+    if (firstLine.includes('\t')) return { format: 'tsv', csvSeparator: ',' };
+
+    const commaCount = countSeparatorOutsideQuotes(firstLine, ',');
+    const semicolonCount = countSeparatorOutsideQuotes(firstLine, ';');
+    return { format: 'csv', csvSeparator: semicolonCount > commaCount ? ';' : ',' };
+  }
+
+  /**
+   * Parse delimited text (CSV or tab-separated) into rows of cells.
+   * Follows the usual CSV rules: a cell in double quotes may contain the
+   * separator and line breaks, and "" inside quotes is one quote character.
+   * Excel uses the same quoting when it copies cells that contain line breaks.
+   */
+  function parseDelimitedText(rawText, separatorCharacter) {
+    const parsedRows = [];
+    let currentRow = [];
+    let currentCell = '';
+    let insideQuotes = false;
+    let characterPosition = 0;
+
+    while (characterPosition < rawText.length) {
+      const character = rawText[characterPosition];
+
+      if (insideQuotes) {
+        if (character === '"') {
+          if (rawText[characterPosition + 1] === '"') {
+            // Doubled quote inside a quoted cell = one literal quote.
+            currentCell += '"';
+            characterPosition++;
+          } else {
+            insideQuotes = false;
+          }
+        } else {
+          currentCell += character;
+        }
+      } else if (character === '"' && currentCell.trim() === '') {
+        // A quote at the start of a cell opens a quoted cell.
+        currentCell = '';
+        insideQuotes = true;
+      } else if (character === separatorCharacter) {
+        currentRow.push(currentCell);
+        currentCell = '';
+      } else if (character === '\r' || character === '\n') {
+        // End of row; treat \r\n as one line break.
+        if (character === '\r' && rawText[characterPosition + 1] === '\n') characterPosition++;
+        currentRow.push(currentCell);
+        parsedRows.push(currentRow);
+        currentRow = [];
+        currentCell = '';
+      } else {
+        currentCell += character;
+      }
+      characterPosition++;
+    }
+
+    // Last row (text usually does not end with a line break).
+    currentRow.push(currentCell);
+    parsedRows.push(currentRow);
+
+    // Drop rows that are completely empty (blank lines, trailing newline).
+    return parsedRows.filter((rowCells) => rowCells.some((cellText) => cellText.trim() !== ''));
+  }
+
+  /**
+   * Split one Markdown table line into cells. Pipes escaped as \| stay in
+   * the cell text; the outer pipes at the start and end are optional.
+   */
+  function splitMarkdownLine(lineText) {
+    let trimmedLine = lineText.trim();
+    if (trimmedLine.startsWith('|')) trimmedLine = trimmedLine.slice(1);
+    if (trimmedLine.endsWith('|') && !trimmedLine.endsWith('\\|')) trimmedLine = trimmedLine.slice(0, -1);
+
+    const lineCells = [];
+    let currentCell = '';
+    for (let characterPosition = 0; characterPosition < trimmedLine.length; characterPosition++) {
+      const character = trimmedLine[characterPosition];
+      if (character === '\\' && trimmedLine[characterPosition + 1] === '|') {
+        currentCell += '|';
+        characterPosition++;
+      } else if (character === '|') {
+        lineCells.push(currentCell);
+        currentCell = '';
+      } else {
+        currentCell += character;
+      }
+    }
+    lineCells.push(currentCell);
+    // <br> is how Markdown tables show a line break inside a cell.
+    return lineCells.map((cellText) => cellText.replace(/<br\s*\/?>/gi, '\n'));
+  }
+
+  /** Parse a Markdown table: every line with a pipe is a row; separator lines are skipped. */
+  function parseMarkdown(rawText) {
+    return rawText
+      .split(/\r?\n/)
+      .filter((lineText) => lineText.includes('|') && !isMarkdownSeparatorLine(lineText))
+      .map(splitMarkdownLine);
+  }
+
+  /** Give every row the same number of cells by adding empty cells at the end. */
+  function padRowsToSameWidth(tableGrid) {
+    const columnCount = Math.max(0, ...tableGrid.map((rowCells) => rowCells.length));
+    return tableGrid.map((rowCells) => rowCells.concat(Array(columnCount - rowCells.length).fill('')));
+  }
+
+  /** Turn rows into columns and columns into rows. */
+  function swapGrid(tableGrid) {
+    if (tableGrid.length === 0) return [];
+    return tableGrid[0].map((unusedCell, columnIndex) => tableGrid.map((rowCells) => rowCells[columnIndex]));
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Writing output                                                      */
+  /* ------------------------------------------------------------------ */
+
+  /** Header row to use: the first row, or "Column 1, Column 2, ..." when there is none. */
+  function splitHeaderAndBody(tableGrid, hasHeaderRow) {
+    if (hasHeaderRow) return { headerCells: tableGrid[0], bodyRows: tableGrid.slice(1) };
+    const generatedHeader = tableGrid[0].map((unusedCell, columnIndex) => `Column ${columnIndex + 1}`);
+    return { headerCells: generatedHeader, bodyRows: tableGrid };
+  }
+
+  /**
+   * Make text safe for a Markdown table cell: line breaks become <br>,
+   * and pipes are escaped so they do not split the cell.
+   */
+  function escapeMarkdownCell(cellText) {
+    return cellText.replace(/\r?\n/g, '<br>').replace(/\|/g, '\\|');
+  }
+
+  /**
+   * Markdown table: pipe-separated rows with a --- line under the header.
+   * Markdown always needs a header row, so one is generated when the
+   * pasted table has none. With lineUpColumns, cells are padded with spaces
+   * so the columns line up in a plain-text editor.
+   */
+  function gridToMarkdown(tableGrid, hasHeaderRow, lineUpColumns) {
+    const { headerCells, bodyRows } = splitHeaderAndBody(tableGrid, hasHeaderRow);
+    const escapedRows = [headerCells, ...bodyRows].map((rowCells) => rowCells.map(escapeMarkdownCell));
+
+    // Widest cell in each column (at least 3, the length of "---").
+    const columnWidths = headerCells.map((unusedCell, columnIndex) => lineUpColumns
+      ? Math.max(3, ...escapedRows.map((rowCells) => rowCells[columnIndex].length))
+      : 3);
+
+    const padCell = (cellText, columnIndex) => (lineUpColumns ? cellText.padEnd(columnWidths[columnIndex]) : cellText);
+    const toMarkdownLine = (rowCells) => '| ' + rowCells.map(padCell).join(' | ') + ' |';
+    const separatorLine = '| ' + columnWidths.map((columnWidth) => '-'.repeat(columnWidth)).join(' | ') + ' |';
+
+    const [escapedHeader, ...escapedBody] = escapedRows;
+    return [toMarkdownLine(escapedHeader), separatorLine, ...escapedBody.map(toMarkdownLine)].join('\n');
+  }
+
+  /**
+   * CSV: cells that contain the separator, a quote or a line break are put
+   * in double quotes, with quotes inside doubled.
+   */
+  function gridToCsv(tableGrid, separatorCharacter) {
+    const quoteIfNeeded = (cellText) => {
+      const needsQuotes = cellText.includes(separatorCharacter) || /["\r\n]/.test(cellText) ||
+        cellText !== cellText.trim();
+      return needsQuotes ? `"${cellText.replace(/"/g, '""')}"` : cellText;
+    };
+    return tableGrid.map((rowCells) => rowCells.map(quoteIfNeeded).join(separatorCharacter)).join('\r\n');
+  }
+
+  /**
+   * Tab-separated text: Excel puts each tab-separated value in its own cell.
+   * Cells with line breaks or quotes are quoted the same way Excel does it,
+   * so they stay in one cell when pasted back.
+   */
+  function gridToTabSeparated(tableGrid) {
+    const quoteIfNeeded = (cellText) => {
+      const cleanText = cellText.replace(/\t/g, ' ');
+      return /["\r\n]/.test(cleanText) ? `"${cleanText.replace(/"/g, '""')}"` : cleanText;
+    };
+    return tableGrid.map((rowCells) => rowCells.map(quoteIfNeeded).join('\t')).join('\r\n');
+  }
+
+  /** Escape text for use inside HTML markup; line breaks become <br>. */
+  function escapeHtml(rawText) {
+    return rawText
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+      .replace(/\r?\n/g, '<br>');
+  }
+
+  /**
+   * HTML table with simple inline borders. Word and Excel both paste this as
+   * a real table. mso-number-format:"\@" makes Excel keep cells as text, so
+   * values like 007 or 1-2 are not turned into numbers or dates.
+   */
+  function gridToHtmlTable(tableGrid, hasHeaderRow) {
+    const cellStyle = 'border:1px solid #999;padding:4px 8px;mso-number-format:\'\\@\';vertical-align:top;';
+    const headerRows = hasHeaderRow ? tableGrid.slice(0, 1) : [];
+    const bodyRows = hasHeaderRow ? tableGrid.slice(1) : tableGrid;
+
+    const headerHtml = headerRows
+      .map((rowCells) => '<tr>' + rowCells
+        .map((cellText) => `<th style="${cellStyle}background:#eee;text-align:left;">${escapeHtml(cellText)}</th>`)
+        .join('') + '</tr>')
+      .join('');
+    const bodyHtml = bodyRows
+      .map((rowCells) => '<tr>' + rowCells
+        .map((cellText) => `<td style="${cellStyle}">${escapeHtml(cellText)}</td>`)
+        .join('') + '</tr>')
+      .join('');
+    return `<table style="border-collapse:collapse;"><thead>${headerHtml}</thead><tbody>${bodyHtml}</tbody></table>`;
+  }
+
+  /** Text for the "Converted text" box in the chosen format. */
+  function buildOutputText(outputFormat) {
+    if (currentTableGrid.length === 0) return '';
+    if (outputFormat === 'markdown') {
+      return gridToMarkdown(currentTableGrid, firstRowIsHeaderCheckbox.checked, alignMarkdownColumnsCheckbox.checked);
+    }
+    if (outputFormat === 'csv') return gridToCsv(currentTableGrid, csvSeparatorSelect.value);
+    return gridToTabSeparated(currentTableGrid);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Page updates                                                        */
+  /* ------------------------------------------------------------------ */
+
+  /** Render the preview with DOM nodes (textContent keeps pasted HTML from running). */
+  function renderPreview(tableGrid, hasHeaderRow) {
+    previewTable.replaceChildren();
+    if (tableGrid.length === 0) return;
+
+    const bodyRows = hasHeaderRow ? tableGrid.slice(1) : tableGrid;
+    if (hasHeaderRow) {
+      const headerRow = previewTable.createTHead().insertRow();
+      tableGrid[0].forEach((cellText) => {
+        const headerCell = document.createElement('th');
+        headerCell.textContent = cellText;
+        headerRow.appendChild(headerCell);
+      });
+    }
+    const tableBody = previewTable.createTBody();
+    bodyRows.forEach((rowCells) => {
+      const bodyRow = tableBody.insertRow();
+      rowCells.forEach((cellText) => { bodyRow.insertCell().textContent = cellText; });
+    });
+  }
+
+  /** Re-read the input and refresh the preview, labels and converted text. */
+  function refreshOutput() {
+    const rawText = tableInput.value;
+    const hasInput = rawText.trim() !== '';
+
+    // Pick the format: the user's choice, or a guess from the text.
+    const detectedFormat = detectFormat(rawText);
+    const chosenFormat = inputFormatSelect.value === 'auto' ? detectedFormat.format : inputFormatSelect.value;
+
+    let parsedGrid = [];
+    if (hasInput) {
+      if (chosenFormat === 'markdown') parsedGrid = parseMarkdown(rawText);
+      else if (chosenFormat === 'tsv') parsedGrid = parseDelimitedText(rawText, '\t');
+      else parsedGrid = parseDelimitedText(rawText, detectedFormat.csvSeparator);
+    }
+
+    // Note how many rows had a different number of cells than the first row.
+    const firstRowWidth = parsedGrid.length ? parsedGrid[0].length : 0;
+    const raggedRowCount = parsedGrid.filter((rowCells) => rowCells.length !== firstRowWidth).length;
+
+    if (trimCellsCheckbox.checked) {
+      parsedGrid = parsedGrid.map((rowCells) => rowCells.map((cellText) => cellText.trim()));
+    }
+    parsedGrid = padRowsToSameWidth(parsedGrid);
+    if (swapRowsAndColumnsCheckbox.checked) parsedGrid = swapGrid(parsedGrid);
+    currentTableGrid = parsedGrid;
+
+    const hasHeaderRow = firstRowIsHeaderCheckbox.checked;
+    renderPreview(currentTableGrid, hasHeaderRow);
+
+    // Labels: detected format and table size.
+    if (!hasInput) {
+      detectedFormatLabel.textContent = '';
+    } else if (inputFormatSelect.value === 'auto') {
+      const separatorNote = chosenFormat === 'csv' && detectedFormat.csvSeparator === ';' ? ' (semicolons)' : '';
+      detectedFormatLabel.textContent = `Detected: ${FORMAT_NAMES[chosenFormat]}${separatorNote}`;
+    } else {
+      detectedFormatLabel.textContent = `Reading as ${FORMAT_NAMES[chosenFormat]}`;
+    }
+    const columnCount = currentTableGrid.length ? currentTableGrid[0].length : 0;
+    const bodyRowCount = Math.max(0, currentTableGrid.length - (hasHeaderRow ? 1 : 0));
+    tableSizeLabel.textContent = currentTableGrid.length
+      ? `${bodyRowCount} ${bodyRowCount === 1 ? 'row' : 'rows'}, ${columnCount} ${columnCount === 1 ? 'column' : 'columns'}`
+      : '';
+
+    raggedRowsMessage.hidden = raggedRowCount === 0;
+    raggedRowsMessage.textContent = `${raggedRowCount} ${raggedRowCount === 1 ? 'row has' : 'rows have'} a different number of cells than the first row. Empty cells were added at the end. If the columns look wrong, pick the format under "Read as".`;
+
+    // Nothing to copy without a table.
+    emptyMessage.hidden = currentTableGrid.length > 0;
+    copyButtons.forEach((copyButton) => { copyButton.disabled = currentTableGrid.length === 0; });
+    copyStatus.textContent = '';
+
+    convertedOutput.value = buildOutputText(outputFormatSelect.value);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Pasting tables from Word and web pages                              */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Word and web pages put an HTML table on the clipboard. Their plain-text
+   * version loses cell boundaries when a cell has a line break, so when the
+   * clipboard has exactly one <table>, read the cells from the HTML and put
+   * tab-separated text in the box instead. Excel's own plain text is already
+   * tab-separated and is used as it is.
+   */
+  function tableHtmlToTabSeparated(clipboardHtml) {
+    const parsedDocument = new DOMParser().parseFromString(clipboardHtml, 'text/html');
+    const pastedTables = parsedDocument.querySelectorAll('table');
+    if (pastedTables.length !== 1) return null;
+
+    const pastedRows = Array.from(pastedTables[0].rows).map((tableRow) =>
+      Array.from(tableRow.cells).map((tableCell) => {
+        // Keep line breaks from <br> and paragraphs, collapse other whitespace.
+        tableCell.querySelectorAll('br').forEach((lineBreak) => lineBreak.replaceWith('\n'));
+        const paragraphTexts = Array.from(tableCell.querySelectorAll('p'));
+        const cellText = paragraphTexts.length > 1
+          ? paragraphTexts.map((paragraph) => paragraph.textContent).join('\n')
+          : tableCell.textContent;
+        return cellText.replace(/[ \t\u00a0]+/g, ' ').replace(/ *\n */g, '\n').trim();
+      }));
+    return pastedRows.length ? gridToTabSeparated(pastedRows) : null;
+  }
+
+  tableInput.addEventListener('paste', (pasteEvent) => {
+    const clipboardData = pasteEvent.clipboardData;
+    if (!clipboardData) return;
+    const clipboardHtml = clipboardData.getData('text/html');
+    const clipboardText = clipboardData.getData('text/plain');
+    // Excel's plain text is already right; only step in for tables that are not tab-separated cleanly.
+    if (!clipboardHtml || !/<table/i.test(clipboardHtml)) return;
+    if (/urn:schemas-microsoft-com:office:excel/i.test(clipboardHtml) && clipboardText) return;
+
+    const tabSeparatedText = tableHtmlToTabSeparated(clipboardHtml);
+    if (tabSeparatedText === null) return;
+
+    // Replace the selection with the converted text, keeping undo where the browser supports it.
+    pasteEvent.preventDefault();
+    tableInput.focus();
+    if (!document.execCommand('insertText', false, tabSeparatedText)) {
+      tableInput.setRangeText(tabSeparatedText, tableInput.selectionStart, tableInput.selectionEnd, 'end');
+    }
+    refreshOutput();
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* Clipboard                                                           */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Fallback copy using the older copy command. A one-off 'copy' listener puts
+   * both the plain text and the HTML version on the clipboard.
+   */
+  function copyWithCopyCommand(plainText, htmlText) {
+    const fillClipboard = (copyEvent) => {
+      copyEvent.clipboardData.setData('text/plain', plainText);
+      if (htmlText) copyEvent.clipboardData.setData('text/html', htmlText);
+      copyEvent.preventDefault();
+    };
+    document.addEventListener('copy', fillClipboard, { once: true });
+    const copySucceeded = document.execCommand('copy');
+    document.removeEventListener('copy', fillClipboard);
+    return copySucceeded;
+  }
+
+  /**
+   * Put text (and optionally HTML) on the clipboard.
+   * Tries the modern Clipboard API first, then falls back to the copy command.
+   */
+  async function writeToClipboard(plainText, htmlText) {
+    try {
+      if (htmlText && window.ClipboardItem) {
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/plain': new Blob([plainText], { type: 'text/plain' }),
+          'text/html': new Blob([htmlText], { type: 'text/html' }),
+        })]);
+      } else {
+        await navigator.clipboard.writeText(plainText);
+      }
+      return true;
+    } catch (clipboardError) {
+      return copyWithCopyCommand(plainText, htmlText);
+    }
+  }
+
+  // One handler for all four copy buttons; the data attribute picks the format.
+  copyButtons.forEach((copyButton) => {
+    copyButton.addEventListener('click', async () => {
+      const copyFormat = copyButton.dataset.copyFormat;
+      const hasHeaderRow = firstRowIsHeaderCheckbox.checked;
+      let plainText;
+      let htmlText = null;
+
+      if (copyFormat === 'markdown') {
+        plainText = gridToMarkdown(currentTableGrid, hasHeaderRow, alignMarkdownColumnsCheckbox.checked);
+      } else if (copyFormat === 'csv') {
+        plainText = gridToCsv(currentTableGrid, csvSeparatorSelect.value);
+      } else {
+        // Excel and Word: tab-separated text plus an HTML table, so both paste as real cells.
+        plainText = gridToTabSeparated(currentTableGrid);
+        htmlText = gridToHtmlTable(currentTableGrid, hasHeaderRow);
+      }
+
+      const copySucceeded = await writeToClipboard(plainText, htmlText);
+      if (copySucceeded) {
+        copyStatus.textContent = `Copied for ${copyButton.textContent.replace(/^Copy (as |for )/, '')}`;
+      } else {
+        // Clipboard blocked: show the text below and select it so it can be copied by hand.
+        if (copyFormat === 'markdown' || copyFormat === 'csv') outputFormatSelect.value = copyFormat;
+        else outputFormatSelect.value = 'tsv';
+        convertedOutput.value = buildOutputText(outputFormatSelect.value);
+        convertedOutput.select();
+        copyStatus.textContent = 'Your browser blocked the clipboard. The text is selected below; copy it from there.';
+      }
+    });
+  });
+
+  /* ------------------------------------------------------------------ */
+  /* Wiring                                                              */
+  /* ------------------------------------------------------------------ */
+
+  tableInput.addEventListener('input', refreshOutput);
+  [inputFormatSelect, firstRowIsHeaderCheckbox, trimCellsCheckbox, swapRowsAndColumnsCheckbox]
+    .forEach((optionControl) => optionControl.addEventListener('change', refreshOutput));
+  [outputFormatSelect, csvSeparatorSelect, alignMarkdownColumnsCheckbox]
+    .forEach((optionControl) => optionControl.addEventListener('change', () => {
+      convertedOutput.value = buildOutputText(outputFormatSelect.value);
+    }));
+
+  // Clear the input and put the cursor back in it, ready for the next paste.
+  clearInputButton.addEventListener('click', () => {
+    tableInput.value = '';
+    refreshOutput();
+    tableInput.focus();
+  });
+
+  // Tapping the converted text selects all of it, which makes copying by hand easy on a phone.
+  convertedOutput.addEventListener('focus', () => convertedOutput.select());
+
+  // First render with the example table.
+  tableInput.value = EXAMPLE_TABLE;
+  refreshOutput();
+</script>
+
+</body>
+</html>
