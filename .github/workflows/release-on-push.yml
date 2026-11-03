@@ -1,0 +1,72 @@
+# Creates a GitHub Release with a zip of all the tools every time something
+# is pushed to main. Uses only the official actions/checkout action plus the
+# zip and gh tools that are already installed on GitHub's Ubuntu runners.
+name: Release on push to main
+
+on:
+  push:
+    branches:
+      - main
+
+# The built-in GITHUB_TOKEN needs write access to the repo contents
+# in order to create tags and releases.
+permissions:
+  contents: write
+
+# If two pushes land close together, run them one after the other
+# so the releases are created in order and never collide.
+concurrency:
+  group: release-on-push
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    name: Zip the tools and publish a release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the pushed commit
+        uses: actions/checkout@v4
+
+      - name: Work out the release tag and file names
+        id: release_info
+        run: |
+          # Tag scheme: v<year>.<month>.<day>-<run number>, e.g. v2026.11.03-12.
+          # The run number always grows, so every tag is unique even with
+          # several releases on the same day.
+          release_date="$(date -u +%Y.%m.%d)"
+          release_tag="v${release_date}-${GITHUB_RUN_NUMBER}"
+          zip_file_name="smalltools-${release_tag}.zip"
+
+          # Hand the values to the later steps.
+          echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
+          echo "zip_file_name=${zip_file_name}" >> "$GITHUB_OUTPUT"
+
+      - name: Build the zip of all tool files
+        env:
+          ZIP_FILE_NAME: ${{ steps.release_info.outputs.zip_file_name }}
+        run: |
+          # Take every file tracked by git, except the GitHub workflow
+          # folder, which is only for this automation and not part of the tools.
+          git ls-files -- . ':!:.github' > files_to_zip.txt
+
+          echo "Files going into ${ZIP_FILE_NAME}:"
+          cat files_to_zip.txt
+
+          # -X leaves out extra file attributes, -@ reads the file list from stdin.
+          zip -X "${ZIP_FILE_NAME}" -@ < files_to_zip.txt
+
+      - name: Create the GitHub Release with the zip attached
+        env:
+          # gh uses this token to talk to the GitHub API.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release_info.outputs.release_tag }}
+          ZIP_FILE_NAME: ${{ steps.release_info.outputs.zip_file_name }}
+        run: |
+          # Creates the tag on the pushed commit, writes release notes from
+          # the commits since the previous release, and uploads the zip.
+          gh release create "${RELEASE_TAG}" "${ZIP_FILE_NAME}" \
+            --target "${GITHUB_SHA}" \
+            --title "Smalltools ${RELEASE_TAG}" \
+            --generate-notes \
+            --latest

@@ -20,3 +20,10 @@ To add a tool, drop its HTML file in the repo and add an entry to `tools.json`:
 
 `index.html` reads `tools.json` with `fetch()`, so open it through a web server
 (for example GitHub Pages or `python3 -m http.server`), not straight from disk.
+
+## Releases
+
+Every push to `main` creates a GitHub Release with a zip of all the tool files
+(everything in the repo except the `.github` folder). Tags look like
+`v2026.11.03-12`: the date of the push plus the workflow run number.
+The workflow lives in `.github/workflows/release-on-push.yml`.
