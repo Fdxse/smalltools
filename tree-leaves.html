@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tree leaf paths</title>
+<style>
+  /* Same colour scheme and layout as bitwise-table.html. */
+  :root {
+    --page-background: #f3f5f8;
+    --panel-background: #ffffff;
+    --text-color: #1b2230;
+    --muted-text-color: #5b6477;
+    --border-color: #d6dbe4;
+    --accent-color: #2457d6;
+    --accent-text-color: #ffffff;
+    --leaf-background: #e3f3e8;
+    --body-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono-font: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page-background: #13161c;
+      --panel-background: #1c2028;
+      --text-color: #e5e8ee;
+      --muted-text-color: #98a1b3;
+      --border-color: #323947;
+      --accent-color: #7ea1ff;
+      --accent-text-color: #0f1420;
+      --leaf-background: #1d3828;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page-background: #13161c;
+    --panel-background: #1c2028;
+    --text-color: #e5e8ee;
+    --muted-text-color: #98a1b3;
+    --border-color: #323947;
+    --accent-color: #7ea1ff;
+    --accent-text-color: #0f1420;
+    --leaf-background: #1d3828;
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    background: var(--page-background);
+    color: var(--text-color);
+    font-family: var(--body-font);
+    font-size: 15px;
+  }
+  main {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 24px 16px 40px;
+    display: grid;
+    gap: 18px;
+  }
+  h1 { margin: 0; font-size: 24px; text-wrap: balance; }
+  h2 { margin: 0; font-size: 16px; }
+  .intro { margin: 6px 0 0; color: var(--muted-text-color); max-width: 65ch; }
+
+  section {
+    background: var(--panel-background);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 0;
+    display: grid;
+    gap: 12px;
+  }
+  .section-header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+
+  /* Tree input on the left, parsed outline on the right; stacked on phones. */
+  .tree-columns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+  @media (max-width: 640px) { .tree-columns { grid-template-columns: minmax(0, 1fr); } }
+
+  input[type="text"], textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background: var(--page-background);
+    color: var(--text-color);
+    font: inherit;
+  }
+  textarea {
+    min-height: 320px;
+    font-family: var(--mono-font);
+    font-size: 13px;
+    white-space: pre;
+    overflow-x: auto;
+    resize: vertical;
+    tab-size: 4;
+  }
+  input.separator-input { width: 7em; font-family: var(--mono-font); }
+  input:focus-visible, button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 1px; }
+
+  button {
+    padding: 8px 14px;
+    border: 1px solid var(--accent-color);
+    border-radius: 5px;
+    background: var(--accent-color);
+    color: var(--accent-text-color);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--accent-color); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .muted { color: var(--muted-text-color); font-variant-numeric: tabular-nums; }
+  .small { font-size: 13px; }
+
+  /* Parsed outline: leaves are highlighted so you can check the indentation. */
+  .outline-box {
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 8px 10px;
+    overflow: auto;
+    max-height: 340px;
+  }
+  .outline-box ul { margin: 0; padding-left: 18px; }
+  .outline-box > ul { padding-left: 4px; list-style: none; }
+  .outline-box li { margin: 2px 0; }
+  .leaf-label { background: var(--leaf-background); border-radius: 3px; padding: 0 4px; }
+
+  /* Result table scrolls inside its own box on narrow screens. */
+  .table-scroller { overflow-x: auto; }
+  table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { border: 1px solid var(--border-color); padding: 5px 10px; text-align: left; white-space: nowrap; }
+  th { font-size: 13px; }
+  td.bit-code { font-family: var(--mono-font); color: var(--muted-text-color); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Tree leaf paths</h1>
+    <p class="intro">Write or paste a nested list. Indent with spaces or tabs to nest an item under the one above it. Every leaf (an item with nothing under it) becomes one row, named by the whole path of branches that leads to it. Each leaf is also one flag bit: the first leaf is 1, the next 2, then 4, 8 and so on.</p>
+  </header>
+
+  <!-- Tree editor and parsed outline -->
+  <section aria-labelledby="treeHeading">
+    <div class="section-header">
+      <h2 id="treeHeading">Tree</h2>
+      <span class="muted" id="leafCountLabel"></span>
+    </div>
+    <div class="tree-columns">
+      <textarea id="treeInput" spellcheck="false" aria-label="Nested list, one item per line"></textarea>
+      <div>
+        <div class="muted small" style="margin-bottom:6px">How the tree is read (leaves highlighted)</div>
+        <div class="outline-box" id="outlineBox"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <label>Separator <input type="text" class="separator-input" id="separatorInput" value=" > " spellcheck="false"></label>
+      <label><input type="checkbox" id="includeRowNumber" checked> Row number column</label>
+      <label><input type="checkbox" id="includeIntValue" checked> Int column</label>
+      <label><input type="checkbox" id="includeBinaryCode" checked> Binary column</label>
+      <label><input type="checkbox" id="splitLevels"> One column per level</label>
+      <label><input type="checkbox" id="includeNoteColumn"> Note column</label>
+    </div>
+  </section>
+
+  <!-- Link that reopens the page with the current tree filled in -->
+  <section aria-labelledby="linkHeading">
+    <div class="section-header">
+      <h2 id="linkHeading">Link to this tree</h2>
+      <div class="actions">
+        <span class="muted" id="linkCopyStatus" aria-live="polite"></span>
+        <button type="button" class="secondary" id="copyLinkButton">Copy link</button>
+      </div>
+    </div>
+    <input type="text" id="pageLinkOutput" readonly spellcheck="false" aria-label="Link to this page with the current tree">
+  </section>
+
+  <!-- Result table with copy buttons for each target format -->
+  <section aria-labelledby="resultHeading">
+    <div class="section-header">
+      <h2 id="resultHeading">Leaf paths</h2>
+      <div class="actions">
+        <span class="muted" id="copyStatus" aria-live="polite"></span>
+        <button type="button" data-copy-format="markdown">Copy as Markdown</button>
+        <button type="button" data-copy-format="excel">Copy for Excel</button>
+        <button type="button" data-copy-format="word">Copy for Word</button>
+      </div>
+    </div>
+    <p class="muted" id="emptyMessage" hidden>Add at least one item to the tree to generate the table.</p>
+    <div class="table-scroller"><table id="resultTable"></table></div>
+    <div class="actions">
+      <button type="button" class="secondary" id="openBitwiseButton">Open leaves in Bitwise table</button>
+      <span class="muted small" id="bitwiseNote"></span>
+    </div>
+  </section>
+</main>
+
+<script>
+  // The example tree from the request, used when the address has no ?tree=.
+  const EXAMPLE_TREE_TEXT = [
+    '* Car',
+    '   * Wagon',
+    '      * Blue',
+    '      * Red',
+    '   * SetUp',
+    '      * Thing 1',
+    '      * Thing 2',
+    '* Bisycle',
+    '   * Green',
+    '   * Blue',
+    '* AirPlane',
+    '   * One',
+    '      * A',
+    '   * Two',
+    '   * Three',
+  ].join('\n');
+
+  // How many spaces a tab counts as when measuring indentation.
+  const SPACES_PER_TAB = 4;
+
+  // Bitwise table accepts at most this many fields (2^8 = 256 rows).
+  const BITWISE_MAX_FIELD_COUNT = 8;
+  const BITWISE_PAGE_FILE = 'bitwise-table.html';
+
+  // Header text of the optional empty column at the end of the table.
+  const NOTE_COLUMN_HEADER = 'Note';
+
+  // Header texts of the optional flag value columns.
+  const INT_COLUMN_HEADER = 'Int';
+  const BINARY_COLUMN_HEADER = 'Binary';
+
+  /**
+   * Flag value of the leaf at a given position: 2^position.
+   * BigInt keeps the value exact even past 53 leaves.
+   */
+  function leafIntValue(leafPosition) {
+    return (1n << BigInt(leafPosition)).toString();
+  }
+
+  /**
+   * Bit code of the leaf at a given position: a single 1 at that bit, padded
+   * with zeros to one digit per leaf. The first leaf is the right-most bit,
+   * e.g. with 4 leaves: 0001, 0010, 0100, 1000.
+   */
+  function leafBinaryCode(leafPosition, leafCount) {
+    return ('1' + '0'.repeat(leafPosition)).padStart(leafCount, '0');
+  }
+
+  // Page elements we read from or write to.
+  const treeInput = document.getElementById('treeInput');
+  const outlineBox = document.getElementById('outlineBox');
+  const leafCountLabel = document.getElementById('leafCountLabel');
+  const separatorInput = document.getElementById('separatorInput');
+  const includeRowNumberCheckbox = document.getElementById('includeRowNumber');
+  const includeIntValueCheckbox = document.getElementById('includeIntValue');
+  const includeBinaryCodeCheckbox = document.getElementById('includeBinaryCode');
+  const splitLevelsCheckbox = document.getElementById('splitLevels');
+  const includeNoteColumnCheckbox = document.getElementById('includeNoteColumn');
+  const pageLinkOutput = document.getElementById('pageLinkOutput');
+  const copyLinkButton = document.getElementById('copyLinkButton');
+  const linkCopyStatus = document.getElementById('linkCopyStatus');
+  const resultTable = document.getElementById('resultTable');
+  const emptyMessage = document.getElementById('emptyMessage');
+  const copyButtons = document.querySelectorAll('[data-copy-format]');
+  const copyStatus = document.getElementById('copyStatus');
+  const openBitwiseButton = document.getElementById('openBitwiseButton');
+  const bitwiseNote = document.getElementById('bitwiseNote');
+
+  // The table as a plain grid of strings (header row first), rebuilt on every change.
+  // All three copy formats are generated from this.
+  let currentTableGrid = [];
+
+  // Leaf paths from the last refresh (each path is a list of item names, root first).
+  let currentLeafPaths = [];
+
+  /** Width of the leading whitespace on a line, with tabs counted as SPACES_PER_TAB. */
+  function measureIndentation(lineText) {
+    const leadingWhitespace = lineText.match(/^[ \t]*/)[0];
+    let indentWidth = 0;
+    for (const whitespaceCharacter of leadingWhitespace) {
+      indentWidth += whitespaceCharacter === '\t' ? SPACES_PER_TAB : 1;
+    }
+    return indentWidth;
+  }
+
+  /**
+   * Strip a list marker from the start of an item: "* ", "- ", "+ ", "• ",
+   * or a number like "1. " / "1) ". Text without a marker is kept as it is.
+   */
+  function stripListMarker(itemText) {
+    return itemText.replace(/^([*\-+•]|\d+[.)])\s+/, '').trim();
+  }
+
+  /**
+   * Parse the indented text into a tree.
+   * Each node is { name, children: [] }. A line becomes a child of the closest
+   * line above it that is indented less. Blank lines are ignored, so any
+   * indentation size works (2 spaces, 3 spaces, tabs...).
+   * Returns the list of top-level nodes.
+   */
+  function parseTree(treeText) {
+    const topLevelNodes = [];
+    // Stack of open parents: { indentWidth, node }. The last entry is the deepest.
+    const parentStack = [];
+
+    treeText.split(/\r?\n/).forEach((lineText) => {
+      if (lineText.trim() === '') return;
+      const itemName = stripListMarker(lineText.trim());
+      if (itemName === '') return;
+
+      const indentWidth = measureIndentation(lineText);
+      const newNode = { name: itemName, children: [] };
+
+      // Close every parent that is not indented less than this line.
+      while (parentStack.length && parentStack[parentStack.length - 1].indentWidth >= indentWidth) {
+        parentStack.pop();
+      }
+
+      if (parentStack.length) {
+        parentStack[parentStack.length - 1].node.children.push(newNode);
+      } else {
+        topLevelNodes.push(newNode);
+      }
+      parentStack.push({ indentWidth, node: newNode });
+    });
+    return topLevelNodes;
+  }
+
+  /**
+   * Walk the tree depth-first and collect the path to every leaf, in the
+   * order the leaves appear. A path is a list of names, root first.
+   */
+  function collectLeafPaths(nodeList, parentPath = [], leafPaths = []) {
+    nodeList.forEach((treeNode) => {
+      const nodePath = [...parentPath, treeNode.name];
+      if (treeNode.children.length === 0) {
+        leafPaths.push(nodePath);
+      } else {
+        collectLeafPaths(treeNode.children, nodePath, leafPaths);
+      }
+    });
+    return leafPaths;
+  }
+
+  /** Draw the parsed tree as a nested list, with leaves highlighted. */
+  function renderOutline(nodeList) {
+    const buildList = (childNodes) => {
+      const listElement = document.createElement('ul');
+      childNodes.forEach((treeNode) => {
+        const listItem = document.createElement('li');
+        const nameLabel = document.createElement('span');
+        nameLabel.textContent = treeNode.name;
+        if (treeNode.children.length === 0) nameLabel.className = 'leaf-label';
+        listItem.appendChild(nameLabel);
+        if (treeNode.children.length) listItem.appendChild(buildList(treeNode.children));
+        listElement.appendChild(listItem);
+      });
+      return listElement;
+    };
+    outlineBox.replaceChildren();
+    if (nodeList.length) outlineBox.appendChild(buildList(nodeList));
+  }
+
+  /**
+   * Turn the leaf paths into a grid of strings: the first row is the header,
+   * every following row is one leaf.
+   * - Joined mode: one "Name" column with the path joined by the separator.
+   * - Split mode: one column per level ("Level 1", "Level 2", ...); shorter
+   *   paths leave the deeper columns empty.
+   */
+  function buildTableGrid(leafPaths, separatorText, tableOptions) {
+    const { showRowNumber, showIntValue, showBinaryCode, splitIntoLevels, showNoteColumn } = tableOptions;
+    const deepestLevelCount = Math.max(0, ...leafPaths.map((leafPath) => leafPath.length));
+
+    const headerCells = [];
+    if (showRowNumber) headerCells.push('#');
+    if (showIntValue) headerCells.push(INT_COLUMN_HEADER);
+    if (showBinaryCode) headerCells.push(BINARY_COLUMN_HEADER);
+    if (splitIntoLevels) {
+      for (let levelNumber = 1; levelNumber <= deepestLevelCount; levelNumber++) {
+        headerCells.push(`Level ${levelNumber}`);
+      }
+    } else {
+      headerCells.push('Name');
+    }
+    if (showNoteColumn) headerCells.push(NOTE_COLUMN_HEADER);
+
+    const tableGrid = [headerCells];
+    leafPaths.forEach((leafPath, rowIndex) => {
+      const bodyCells = [];
+      if (showRowNumber) bodyCells.push(String(rowIndex + 1));
+      if (showIntValue) bodyCells.push(leafIntValue(rowIndex));
+      if (showBinaryCode) bodyCells.push(leafBinaryCode(rowIndex, leafPaths.length));
+      if (splitIntoLevels) {
+        for (let levelIndex = 0; levelIndex < deepestLevelCount; levelIndex++) {
+          bodyCells.push(leafPath[levelIndex] ?? '');
+        }
+      } else {
+        bodyCells.push(leafPath.join(separatorText));
+      }
+      // Empty note cell, to be filled in after pasting.
+      if (showNoteColumn) bodyCells.push('');
+      tableGrid.push(bodyCells);
+    });
+    return tableGrid;
+  }
+
+  /**
+   * Make text safe for a Markdown table cell: no newlines, and pipes escaped
+   * so they do not split the cell.
+   */
+  function escapeMarkdownCell(cellText) {
+    return cellText.replace(/\r?\n/g, ' ').trim().replace(/\|/g, '\\|');
+  }
+
+  /** Markdown table: pipe-separated rows with a --- separator under the header. */
+  function gridToMarkdown(tableGrid) {
+    const [headerCells, ...bodyRows] = tableGrid;
+    const toMarkdownLine = (rowCells) => '| ' + rowCells.map(escapeMarkdownCell).join(' | ') + ' |';
+    return [
+      toMarkdownLine(headerCells),
+      '| ' + headerCells.map(() => '---').join(' | ') + ' |',
+      ...bodyRows.map(toMarkdownLine),
+    ].join('\n');
+  }
+
+  /**
+   * Tab-separated text: Excel puts each tab-separated value in its own cell.
+   * Bit codes like "0010" would lose their leading zeros in Excel, so the
+   * binary column is written as ="0010", which Excel shows as the text 0010.
+   */
+  function gridToTabSeparated(tableGrid, keepTextColumnIndex) {
+    return tableGrid
+      .map((rowCells, rowIndex) => rowCells
+        .map((cellText, columnIndex) => {
+          const cleanText = cellText.replace(/[\t\r\n]+/g, ' ');
+          // Keep leading zeros in the binary column (body rows only).
+          return rowIndex > 0 && columnIndex === keepTextColumnIndex ? `="${cleanText}"` : cleanText;
+        })
+        .join('\t'))
+      .join('\r\n');
+  }
+
+  /** Which column (if any) holds the binary code, so Excel keeps its leading zeros. */
+  function getBinaryColumnIndex() {
+    if (!includeBinaryCodeCheckbox.checked) return -1;
+    return (includeRowNumberCheckbox.checked ? 1 : 0) + (includeIntValueCheckbox.checked ? 1 : 0);
+  }
+
+  /** Escape text for use inside HTML markup. */
+  function escapeHtml(rawText) {
+    return rawText
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /**
+   * HTML table with simple inline borders. Word and Excel both paste this as a
+   * real table. mso-number-format keeps cells as text in Excel (so "1" stays "1").
+   */
+  function gridToHtmlTable(tableGrid) {
+    const cellStyle = 'border:1px solid #999;padding:4px 8px;mso-number-format:\'\\@\';';
+    const [headerCells, ...bodyRows] = tableGrid;
+    const headerHtml = '<tr>' + headerCells
+      .map((cellText) => `<th style="${cellStyle}background:#eee;text-align:left;">${escapeHtml(cellText)}</th>`)
+      .join('') + '</tr>';
+    const bodyHtml = bodyRows
+      .map((rowCells) => '<tr>' + rowCells
+        .map((cellText) => `<td style="${cellStyle}">${escapeHtml(cellText)}</td>`)
+        .join('') + '</tr>')
+      .join('');
+    return `<table style="border-collapse:collapse;"><thead>${headerHtml}</thead><tbody>${bodyHtml}</tbody></table>`;
+  }
+
+  /** Render the result table with DOM nodes (textContent keeps it safe from HTML in names). */
+  function renderResultTable(tableGrid) {
+    resultTable.replaceChildren();
+    if (tableGrid.length === 0) return;
+    const [headerCells, ...bodyRows] = tableGrid;
+
+    const headerRow = resultTable.createTHead().insertRow();
+    headerCells.forEach((headerText) => {
+      const headerCell = document.createElement('th');
+      headerCell.textContent = headerText;
+      headerRow.appendChild(headerCell);
+    });
+
+    const tableBody = resultTable.createTBody();
+    const binaryColumnIndex = getBinaryColumnIndex();
+    bodyRows.forEach((rowCells) => {
+      const bodyRow = tableBody.insertRow();
+      rowCells.forEach((cellText, columnIndex) => {
+        const bodyCell = bodyRow.insertCell();
+        bodyCell.textContent = cellText;
+        // Bit codes in a monospace font so the digits line up.
+        if (columnIndex === binaryColumnIndex) bodyCell.className = 'bit-code';
+      });
+    });
+  }
+
+  /**
+   * Encode only the characters that would break the query string (% & = # +)
+   * and line breaks. Spaces stay as plain spaces so the link is readable.
+   */
+  function encodeQueryPart(rawText) {
+    return rawText
+      .replace(/%/g, '%25').replace(/&/g, '%26').replace(/=/g, '%3D')
+      .replace(/#/g, '%23').replace(/\+/g, '%2B')
+      .replace(/\r?\n/g, '%0A').replace(/\t/g, '%09');
+  }
+
+  /** Address of a file in the same folder as this page. */
+  function siblingPageAddress(fileName) {
+    const pageAddress = window.location.href.split(/[?#]/)[0];
+    return pageAddress.replace(/[^/]*$/, fileName);
+  }
+
+  /** Build this page's address with the current tree as ?tree=... */
+  function buildPageLink(treeText) {
+    const pageAddress = window.location.href.split(/[?#]/)[0];
+    return treeText.trim() ? `${pageAddress}?tree=${encodeQueryPart(treeText)}` : pageAddress;
+  }
+
+  /**
+   * Link to bitwise-table.html with each leaf path as a field (Yes/No states).
+   * Uses the same plain-space query format the bitwise table reads.
+   */
+  function buildBitwiseLink(leafPaths, separatorText) {
+    const queryPairs = leafPaths.map((leafPath) => `${encodeQueryPart(leafPath.join(separatorText))}=Yes,No`);
+    return `${siblingPageAddress(BITWISE_PAGE_FILE)}?${queryPairs.join('&')}`;
+  }
+
+  /** Re-read the tree and recalculate outline, table, link and buttons. */
+  function refreshOutput() {
+    const treeNodes = parseTree(treeInput.value);
+    currentLeafPaths = collectLeafPaths(treeNodes);
+    const separatorText = separatorInput.value;
+
+    renderOutline(treeNodes);
+
+    currentTableGrid = currentLeafPaths.length
+      ? buildTableGrid(currentLeafPaths, separatorText, {
+          showRowNumber: includeRowNumberCheckbox.checked,
+          showIntValue: includeIntValueCheckbox.checked,
+          showBinaryCode: includeBinaryCodeCheckbox.checked,
+          splitIntoLevels: splitLevelsCheckbox.checked,
+          showNoteColumn: includeNoteColumnCheckbox.checked,
+        })
+      : [];
+    renderResultTable(currentTableGrid);
+
+    // Nothing to copy without leaves.
+    const hasLeaves = currentLeafPaths.length > 0;
+    emptyMessage.hidden = hasLeaves;
+    copyButtons.forEach((copyButton) => { copyButton.disabled = !hasLeaves; });
+    copyStatus.textContent = '';
+
+    leafCountLabel.textContent = `${currentLeafPaths.length} ${currentLeafPaths.length === 1 ? 'leaf' : 'leaves'}`;
+
+    pageLinkOutput.value = buildPageLink(treeInput.value);
+    linkCopyStatus.textContent = '';
+
+    // The bitwise table only takes up to 8 fields.
+    const fitsInBitwise = hasLeaves && currentLeafPaths.length <= BITWISE_MAX_FIELD_COUNT;
+    openBitwiseButton.disabled = !fitsInBitwise;
+    bitwiseNote.textContent = fitsInBitwise
+      ? `Every combination of the ${currentLeafPaths.length} leaves, ${2 ** currentLeafPaths.length} rows.`
+      : `The Bitwise table takes up to ${BITWISE_MAX_FIELD_COUNT} fields; this tree has ${currentLeafPaths.length} leaves.`;
+  }
+
+  /**
+   * Fallback copy using the older copy command. A one-off 'copy' listener puts
+   * both the plain text and the HTML version on the clipboard.
+   */
+  function copyWithCopyCommand(plainText, htmlText) {
+    const fillClipboard = (copyEvent) => {
+      copyEvent.clipboardData.setData('text/plain', plainText);
+      if (htmlText) copyEvent.clipboardData.setData('text/html', htmlText);
+      copyEvent.preventDefault();
+    };
+    document.addEventListener('copy', fillClipboard, { once: true });
+    const copySucceeded = document.execCommand('copy');
+    document.removeEventListener('copy', fillClipboard);
+    return copySucceeded;
+  }
+
+  /**
+   * Put text (and optionally HTML) on the clipboard.
+   * Tries the modern Clipboard API first, then falls back to the copy command.
+   */
+  async function writeToClipboard(plainText, htmlText) {
+    try {
+      if (htmlText && window.ClipboardItem) {
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/plain': new Blob([plainText], { type: 'text/plain' }),
+          'text/html': new Blob([htmlText], { type: 'text/html' }),
+        })]);
+      } else {
+        await navigator.clipboard.writeText(plainText);
+      }
+      return true;
+    } catch (clipboardError) {
+      return copyWithCopyCommand(plainText, htmlText);
+    }
+  }
+
+  // One handler for all three copy buttons; the data attribute picks the format.
+  copyButtons.forEach((copyButton) => {
+    copyButton.addEventListener('click', async () => {
+      const copyFormat = copyButton.dataset.copyFormat;
+      let plainText;
+      let htmlText = null;
+
+      if (copyFormat === 'markdown') {
+        // Markdown is plain text only.
+        plainText = gridToMarkdown(currentTableGrid);
+      } else {
+        // Excel and Word: tab-separated text plus an HTML table for formatting.
+        // Only Excel needs the ="..." trick for leading zeros.
+        plainText = gridToTabSeparated(currentTableGrid, copyFormat === 'excel' ? getBinaryColumnIndex() : -1);
+        htmlText = gridToHtmlTable(currentTableGrid);
+      }
+
+      const copySucceeded = await writeToClipboard(plainText, htmlText);
+      copyStatus.textContent = copySucceeded
+        ? `Copied for ${copyButton.textContent.replace(/^Copy (as |for )/, '')}`
+        : 'Your browser blocked the clipboard. Try again in another browser.';
+    });
+  });
+
+  // Copy the link as plain text, with spaces kept as spaces.
+  copyLinkButton.addEventListener('click', async () => {
+    const copySucceeded = await writeToClipboard(pageLinkOutput.value, null);
+    if (!copySucceeded) pageLinkOutput.select();
+    linkCopyStatus.textContent = copySucceeded ? 'Copied' : 'Selected. Press Ctrl+C to copy.';
+  });
+
+  // Open the bitwise table with the leaf paths as its fields.
+  openBitwiseButton.addEventListener('click', () => {
+    window.open(buildBitwiseLink(currentLeafPaths, separatorInput.value), '_blank');
+  });
+
+  // Tab in the tree box indents instead of moving focus (Esc then Tab still leaves).
+  let tabIndentsTree = true;
+  treeInput.addEventListener('keydown', (keyEvent) => {
+    if (keyEvent.key === 'Escape') { tabIndentsTree = false; return; }
+    if (keyEvent.key !== 'Tab' || !tabIndentsTree || keyEvent.shiftKey) return;
+    keyEvent.preventDefault();
+    const selectionStart = treeInput.selectionStart;
+    treeInput.setRangeText('\t', selectionStart, treeInput.selectionEnd, 'end');
+    refreshOutput();
+  });
+  treeInput.addEventListener('focus', () => { tabIndentsTree = true; });
+
+  // Every edit or option change updates everything.
+  [treeInput, separatorInput].forEach((inputElement) => inputElement.addEventListener('input', refreshOutput));
+  [includeRowNumberCheckbox, includeIntValueCheckbox, includeBinaryCodeCheckbox, splitLevelsCheckbox, includeNoteColumnCheckbox]
+    .forEach((checkbox) => checkbox.addEventListener('change', refreshOutput));
+
+  /**
+   * Read the tree from ?tree=... in the address. Line breaks are %0A;
+   * plain spaces, + and %20 all work as spaces. Returns null when missing.
+   */
+  function readTreeFromQueryString() {
+    const treeMatch = window.location.search.match(/[?&]tree=([^&]*)/);
+    if (!treeMatch) return null;
+    const withSpaces = treeMatch[1].replace(/\+/g, ' ');
+    try { return decodeURIComponent(withSpaces); } catch (decodeError) { return withSpaces; }
+  }
+
+  // Start with the tree from the address, or the example.
+  treeInput.value = readTreeFromQueryString() ?? EXAMPLE_TREE_TEXT;
+  refreshOutput();
+</script>
+</body>
+</html>

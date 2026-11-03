@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>body{margin:0}</style>
+<title>Bitwise combination table</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: one centred column; fields panel on top, Markdown and preview below. */
+  :root {
+    --page-background: #f3f5f8;
+    --panel-background: #ffffff;
+    --text-color: #1b2230;
+    --muted-text-color: #5b6477;
+    --border-color: #d6dbe4;
+    --accent-color: #2457d6;
+    --accent-text-color: #ffffff;
+    --state-a-background: #e3f3e8;
+    --state-b-background: #fbe8e4;
+    --body-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono-font: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page-background: #13161c;
+      --panel-background: #1c2028;
+      --text-color: #e5e8ee;
+      --muted-text-color: #98a1b3;
+      --border-color: #323947;
+      --accent-color: #7ea1ff;
+      --accent-text-color: #0f1420;
+      --state-a-background: #1d3828;
+      --state-b-background: #432520;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page-background: #13161c;
+    --panel-background: #1c2028;
+    --text-color: #e5e8ee;
+    --muted-text-color: #98a1b3;
+    --border-color: #323947;
+    --accent-color: #7ea1ff;
+    --accent-text-color: #0f1420;
+    --state-a-background: #1d3828;
+    --state-b-background: #432520;
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--page-background);
+    color: var(--text-color);
+    font-family: var(--body-font);
+    font-size: 15px;
+  }
+  main {
+    max-width: 920px;
+    margin: 0 auto;
+    padding-block: 24px 40px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: grid;
+    gap: 18px;
+  }
+  h1 { margin: 0; font-size: 24px; text-wrap: balance; }
+  h2 { margin: 0; font-size: 16px; }
+  .intro { margin: 6px 0 0; color: var(--muted-text-color); max-width: 65ch; }
+
+  section {
+    background: var(--panel-background);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 0;
+    display: grid;
+    gap: 12px;
+  }
+  .section-header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+
+  /* Field rows: bit number, name, state A, state B, remove button. */
+  .field-grid {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) 34px;
+    gap: 8px;
+    align-items: center;
+  }
+  .column-label {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted-text-color);
+  }
+  .bit-number { font-family: var(--mono-font); color: var(--muted-text-color); text-align: right; font-variant-numeric: tabular-nums; }
+
+  input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background: var(--page-background);
+    color: var(--text-color);
+    font: inherit;
+  }
+  input:focus-visible, button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 1px; }
+
+  button {
+    padding: 8px 14px;
+    border: 1px solid var(--accent-color);
+    border-radius: 5px;
+    background: var(--accent-color);
+    color: var(--accent-text-color);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--accent-color); }
+  button.remove-button {
+    padding: 4px 0;
+    background: transparent;
+    border-color: var(--border-color);
+    color: var(--muted-text-color);
+    font-weight: 400;
+  }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .muted { color: var(--muted-text-color); font-variant-numeric: tabular-nums; }
+
+  textarea {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 200px;
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background: var(--page-background);
+    color: var(--text-color);
+    font-family: var(--mono-font);
+    font-size: 13px;
+    white-space: pre;
+    overflow-x: auto;
+    resize: vertical;
+  }
+
+  /* Preview table scrolls inside its own box on narrow screens. */
+  .table-scroller { overflow-x: auto; }
+  table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { border: 1px solid var(--border-color); padding: 5px 10px; text-align: left; white-space: nowrap; }
+  th { font-size: 13px; }
+  td.state-a { background: var(--state-a-background); }
+  td.state-b { background: var(--state-b-background); }
+  td.bit-pattern { font-family: var(--mono-font); color: var(--muted-text-color); }
+
+  /* Phone width: name on its own line, states below it. */
+  @media (max-width: 560px) {
+    .field-grid { grid-template-columns: 22px minmax(0, 1fr) minmax(0, 1fr) 34px; }
+    .field-grid .header-cell { display: none; }
+    .field-grid .bit-number { grid-row: span 2; }
+    .field-grid .field-name-input { grid-column: 2 / 4; }
+    .field-grid .remove-button { grid-row: span 2; }
+  }
+</style>
+
+</head><body>
+<main>
+  <header>
+    <h1>Bitwise combination table</h1>
+    <p class="intro">Add up to 8 fields with two states each. The Markdown table below updates as you type, with one row for every combination (2<sup>n</sup> rows).</p>
+  </header>
+
+  <!-- Field editor -->
+  <section aria-labelledby="fieldsHeading">
+    <div class="section-header">
+      <h2 id="fieldsHeading">Fields</h2>
+      <span class="muted" id="rowCountLabel"></span>
+    </div>
+    <div class="field-grid" id="fieldGrid"></div>
+    <div class="actions">
+      <button type="button" class="secondary" id="addFieldButton">Add field</button>
+      <label><input type="checkbox" id="includeRowNumber" checked> Row number column</label>
+      <label><input type="checkbox" id="includeBitPattern"> Bit pattern column</label>
+      <label><input type="checkbox" id="includeNoteColumn"> Note column</label>
+    </div>
+  </section>
+
+  <!-- Link that reopens the page with the current fields filled in -->
+  <section aria-labelledby="linkHeading">
+    <div class="section-header">
+      <h2 id="linkHeading">Link to these fields</h2>
+      <div class="actions">
+        <span class="muted" id="linkCopyStatus" aria-live="polite"></span>
+        <button type="button" class="secondary" id="copyLinkButton">Copy link</button>
+      </div>
+    </div>
+    <input type="text" id="pageLinkOutput" readonly spellcheck="false" aria-label="Link to this page with the current fields">
+  </section>
+
+  <!-- Result table with copy buttons for each target format -->
+  <section aria-labelledby="previewHeading">
+    <div class="section-header">
+      <h2 id="previewHeading">Combinations</h2>
+      <div class="actions">
+        <span class="muted" id="copyStatus" aria-live="polite"></span>
+        <button type="button" data-copy-format="markdown">Copy as Markdown</button>
+        <button type="button" data-copy-format="excel">Copy for Excel</button>
+        <button type="button" data-copy-format="word">Copy for Word</button>
+      </div>
+    </div>
+    <p class="muted" id="emptyMessage" hidden>Give at least one field a name to generate the table.</p>
+    <div class="table-scroller"><table id="previewTable"></table></div>
+  </section>
+</main>
+
+<script>
+  // Maximum number of fields (2^8 = 256 rows).
+  const MAX_FIELD_COUNT = 8;
+
+  // Default labels used when a state box is left empty.
+  const DEFAULT_STATE_A = 'Yes';
+  const DEFAULT_STATE_B = 'No';
+
+  // Current list of fields. Starts with the example from the request.
+  let fieldList = [
+    { name: 'Firstname', stateA: 'Yes', stateB: 'No' },
+    { name: 'Address', stateA: 'Yes', stateB: 'No' },
+    { name: 'Workaddress', stateA: 'Set', stateB: 'Not set' },
+  ];
+
+  // Page elements we read from or write to.
+  const fieldGrid = document.getElementById('fieldGrid');
+  const addFieldButton = document.getElementById('addFieldButton');
+  const includeRowNumberCheckbox = document.getElementById('includeRowNumber');
+  const includeBitPatternCheckbox = document.getElementById('includeBitPattern');
+  const includeNoteColumnCheckbox = document.getElementById('includeNoteColumn');
+
+  // Header text of the optional empty column at the end of the table.
+  const NOTE_COLUMN_HEADER = 'Note';
+  const previewTable = document.getElementById('previewTable');
+  const emptyMessage = document.getElementById('emptyMessage');
+  const rowCountLabel = document.getElementById('rowCountLabel');
+  const copyButtons = document.querySelectorAll('[data-copy-format]');
+  const copyStatus = document.getElementById('copyStatus');
+  const pageLinkOutput = document.getElementById('pageLinkOutput');
+  const copyLinkButton = document.getElementById('copyLinkButton');
+  const linkCopyStatus = document.getElementById('linkCopyStatus');
+
+  // The table as a plain grid of strings (header row first), rebuilt on every change.
+  // All three copy formats are generated from this.
+  let currentTableGrid = [];
+
+  /**
+   * Make text safe for a Markdown table cell: no newlines, and pipes escaped
+   * so they do not split the cell.
+   */
+  function escapeMarkdownCell(cellText) {
+    return cellText.replace(/\r?\n/g, ' ').trim().replace(/\|/g, '\\|');
+  }
+
+  /**
+   * Fields that count towards the table: the ones with a name.
+   * Empty state boxes fall back to Yes/No.
+   */
+  function getActiveFields() {
+    return fieldList
+      .filter((field) => field.name.trim() !== '')
+      .map((field) => ({
+        name: field.name.trim(),
+        stateA: field.stateA.trim() || DEFAULT_STATE_A,
+        stateB: field.stateB.trim() || DEFAULT_STATE_B,
+      }));
+  }
+
+  /**
+   * Build every combination. Each row is a number from 0 to 2^n - 1.
+   * The first field is the most significant bit, so it changes slowest and
+   * the last field alternates every row. Bit 0 = state A, bit 1 = state B.
+   * Returns a list of { bitPattern, usesStateB: [bool per field] }.
+   */
+  function buildCombinations(activeFields) {
+    const fieldCount = activeFields.length;
+    const combinationCount = 2 ** fieldCount;
+    const combinationList = [];
+
+    for (let combinationNumber = 0; combinationNumber < combinationCount; combinationNumber++) {
+      const usesStateB = activeFields.map((field, fieldPosition) => {
+        const bitShift = fieldCount - 1 - fieldPosition;
+        return ((combinationNumber >> bitShift) & 1) === 1;
+      });
+      combinationList.push({
+        bitPattern: combinationNumber.toString(2).padStart(fieldCount, '0'),
+        usesStateB,
+      });
+    }
+    return combinationList;
+  }
+
+  /**
+   * Turn the fields and combinations into a grid of strings:
+   * the first row is the header, every following row is one combination.
+   */
+  function buildTableGrid(activeFields, combinationList, showRowNumber, showBitPattern, showNoteColumn) {
+    const headerCells = [];
+    if (showRowNumber) headerCells.push('#');
+    if (showBitPattern) headerCells.push('Bits');
+    activeFields.forEach((field) => headerCells.push(field.name));
+    if (showNoteColumn) headerCells.push(NOTE_COLUMN_HEADER);
+
+    const tableGrid = [headerCells];
+    combinationList.forEach((combination, rowIndex) => {
+      const bodyCells = [];
+      if (showRowNumber) bodyCells.push(String(rowIndex + 1));
+      if (showBitPattern) bodyCells.push(combination.bitPattern);
+      activeFields.forEach((field, fieldPosition) => {
+        bodyCells.push(combination.usesStateB[fieldPosition] ? field.stateB : field.stateA);
+      });
+      // Empty note cell, to be filled in after pasting.
+      if (showNoteColumn) bodyCells.push('');
+      tableGrid.push(bodyCells);
+    });
+    return tableGrid;
+  }
+
+  /** Markdown table: pipe-separated rows with a --- separator under the header. */
+  function gridToMarkdown(tableGrid) {
+    const [headerCells, ...bodyRows] = tableGrid;
+    const toMarkdownLine = (rowCells) => '| ' + rowCells.map(escapeMarkdownCell).join(' | ') + ' |';
+    return [
+      toMarkdownLine(headerCells),
+      '| ' + headerCells.map(() => '---').join(' | ') + ' |',
+      ...bodyRows.map(toMarkdownLine),
+    ].join('\n');
+  }
+
+  /**
+   * Tab-separated text: Excel puts each tab-separated value in its own cell.
+   * Bit patterns like "010" would lose their leading zero in Excel, so that
+   * column is written as ="010", which Excel shows as the text 010.
+   */
+  function gridToTabSeparated(tableGrid, keepTextColumnIndex) {
+    return tableGrid
+      .map((rowCells, rowIndex) => rowCells
+        .map((cellText, columnIndex) => {
+          const cleanText = cellText.replace(/[\t\r\n]+/g, ' ');
+          // Keep leading zeros in the bit pattern column (body rows only).
+          return rowIndex > 0 && columnIndex === keepTextColumnIndex ? `="${cleanText}"` : cleanText;
+        })
+        .join('\t'))
+      .join('\r\n');
+  }
+
+  /** Escape text for use inside HTML markup. */
+  function escapeHtml(rawText) {
+    return rawText
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /**
+   * HTML table with simple inline borders. Word and Excel both paste this as a
+   * real table. mso-number-format keeps "010" as text in Excel.
+   */
+  function gridToHtmlTable(tableGrid) {
+    const cellStyle = 'border:1px solid #999;padding:4px 8px;mso-number-format:\'\\@\';';
+    const [headerCells, ...bodyRows] = tableGrid;
+    const headerHtml = '<tr>' + headerCells
+      .map((cellText) => `<th style="${cellStyle}background:#eee;text-align:left;">${escapeHtml(cellText)}</th>`)
+      .join('') + '</tr>';
+    const bodyHtml = bodyRows
+      .map((rowCells) => '<tr>' + rowCells
+        .map((cellText) => `<td style="${cellStyle}">${escapeHtml(cellText)}</td>`)
+        .join('') + '</tr>')
+      .join('');
+    return `<table style="border-collapse:collapse;"><thead>${headerHtml}</thead><tbody>${bodyHtml}</tbody></table>`;
+  }
+
+  /** Render the preview table with DOM nodes (textContent keeps it safe from HTML in names). */
+  function renderPreview(activeFields, combinationList, showRowNumber, showBitPattern, showNoteColumn) {
+    previewTable.replaceChildren();
+    if (activeFields.length === 0) return;
+
+    // Header row
+    const tableHead = previewTable.createTHead();
+    const headerRow = tableHead.insertRow();
+    const headerLabels = [];
+    if (showRowNumber) headerLabels.push('#');
+    if (showBitPattern) headerLabels.push('Bits');
+    activeFields.forEach((field) => headerLabels.push(field.name));
+    if (showNoteColumn) headerLabels.push(NOTE_COLUMN_HEADER);
+    headerLabels.forEach((headerLabel) => {
+      const headerCell = document.createElement('th');
+      headerCell.textContent = headerLabel;
+      headerRow.appendChild(headerCell);
+    });
+
+    // One body row per combination, coloured by state A / state B.
+    const tableBody = previewTable.createTBody();
+    combinationList.forEach((combination, rowIndex) => {
+      const bodyRow = tableBody.insertRow();
+      if (showRowNumber) bodyRow.insertCell().textContent = String(rowIndex + 1);
+      if (showBitPattern) {
+        const bitCell = bodyRow.insertCell();
+        bitCell.textContent = combination.bitPattern;
+        bitCell.className = 'bit-pattern';
+      }
+      activeFields.forEach((field, fieldPosition) => {
+        const stateCell = bodyRow.insertCell();
+        const usesStateB = combination.usesStateB[fieldPosition];
+        stateCell.textContent = usesStateB ? field.stateB : field.stateA;
+        stateCell.className = usesStateB ? 'state-b' : 'state-a';
+      });
+      // Empty note cell at the end of the row.
+      if (showNoteColumn) bodyRow.insertCell();
+    });
+  }
+
+  /**
+   * Encode only the characters that would break the query string (% & = # +),
+   * plus commas in state A. Spaces stay as plain spaces so the link is readable.
+   */
+  function encodeQueryPart(rawText, encodeCommas) {
+    let encodedText = rawText
+      .replace(/%/g, '%25').replace(/&/g, '%26').replace(/=/g, '%3D')
+      .replace(/#/g, '%23').replace(/\+/g, '%2B');
+    if (encodeCommas) encodedText = encodedText.replace(/,/g, '%2C');
+    return encodedText;
+  }
+
+  /** Build this page's address with the current fields as the query string. */
+  function buildPageLink(activeFields) {
+    const pageAddress = window.location.href.split(/[?#]/)[0];
+    const queryPairs = activeFields.map((field) =>
+      `${encodeQueryPart(field.name, false)}=${encodeQueryPart(field.stateA, true)},${encodeQueryPart(field.stateB, false)}`);
+    return queryPairs.length ? `${pageAddress}?${queryPairs.join('&')}` : pageAddress;
+  }
+
+  /** Recalculate Markdown, preview and row count from the current fields. */
+  function refreshOutput() {
+    const activeFields = getActiveFields();
+    const showRowNumber = includeRowNumberCheckbox.checked;
+    const showBitPattern = includeBitPatternCheckbox.checked;
+    const showNoteColumn = includeNoteColumnCheckbox.checked;
+    const combinationList = activeFields.length ? buildCombinations(activeFields) : [];
+
+    currentTableGrid = activeFields.length
+      ? buildTableGrid(activeFields, combinationList, showRowNumber, showBitPattern, showNoteColumn)
+      : [];
+    renderPreview(activeFields, combinationList, showRowNumber, showBitPattern, showNoteColumn);
+
+    // Nothing to copy without fields.
+    emptyMessage.hidden = activeFields.length > 0;
+    copyButtons.forEach((copyButton) => { copyButton.disabled = activeFields.length === 0; });
+
+    pageLinkOutput.value = buildPageLink(activeFields);
+    linkCopyStatus.textContent = '';
+
+    rowCountLabel.textContent = `${activeFields.length} of ${MAX_FIELD_COUNT} fields, ${combinationList.length} rows`;
+    addFieldButton.disabled = fieldList.length >= MAX_FIELD_COUNT;
+    copyStatus.textContent = '';
+  }
+
+  /** Create one text input bound to a property of a field. */
+  function createFieldInput(fieldIndex, propertyName, placeholderText, accessibleLabel) {
+    const textInput = document.createElement('input');
+    textInput.type = 'text';
+    textInput.id = `${propertyName}-${fieldIndex}`;
+    textInput.value = fieldList[fieldIndex][propertyName];
+    textInput.placeholder = placeholderText;
+    textInput.setAttribute('aria-label', accessibleLabel);
+    textInput.addEventListener('input', () => {
+      fieldList[fieldIndex][propertyName] = textInput.value;
+      refreshOutput();
+    });
+    return textInput;
+  }
+
+  /** Rebuild the field editor rows (called when fields are added or removed). */
+  function renderFieldEditor() {
+    fieldGrid.replaceChildren();
+
+    // Column headings
+    ['', 'Field name', 'State A', 'State B', ''].forEach((headingText) => {
+      const headingCell = document.createElement('span');
+      headingCell.className = 'column-label header-cell';
+      headingCell.textContent = headingText;
+      fieldGrid.appendChild(headingCell);
+    });
+
+    fieldList.forEach((field, fieldIndex) => {
+      const fieldNumber = fieldIndex + 1;
+
+      const bitNumber = document.createElement('span');
+      bitNumber.className = 'bit-number';
+      bitNumber.textContent = String(fieldNumber);
+
+      const nameInput = createFieldInput(fieldIndex, 'name', 'e.g. Firstname', `Name of field ${fieldNumber}`);
+      nameInput.classList.add('field-name-input');
+      const stateAInput = createFieldInput(fieldIndex, 'stateA', DEFAULT_STATE_A, `State A for field ${fieldNumber}`);
+      const stateBInput = createFieldInput(fieldIndex, 'stateB', DEFAULT_STATE_B, `State B for field ${fieldNumber}`);
+
+      const removeButton = document.createElement('button');
+      removeButton.type = 'button';
+      removeButton.className = 'remove-button';
+      removeButton.textContent = '✕';
+      removeButton.setAttribute('aria-label', `Remove field ${fieldNumber}`);
+      removeButton.addEventListener('click', () => {
+        fieldList.splice(fieldIndex, 1);
+        renderFieldEditor();
+        refreshOutput();
+      });
+
+      fieldGrid.append(bitNumber, nameInput, stateAInput, stateBInput, removeButton);
+    });
+  }
+
+  // Add an empty field (up to the maximum) and focus its name box.
+  addFieldButton.addEventListener('click', () => {
+    if (fieldList.length >= MAX_FIELD_COUNT) return;
+    fieldList.push({ name: '', stateA: '', stateB: '' });
+    renderFieldEditor();
+    refreshOutput();
+    document.getElementById(`name-${fieldList.length - 1}`).focus();
+  });
+
+  includeRowNumberCheckbox.addEventListener('change', refreshOutput);
+  includeBitPatternCheckbox.addEventListener('change', refreshOutput);
+  includeNoteColumnCheckbox.addEventListener('change', refreshOutput);
+
+  /**
+   * Fallback copy using the older copy command. A one-off 'copy' listener puts
+   * both the plain text and the HTML version on the clipboard.
+   */
+  function copyWithCopyCommand(plainText, htmlText) {
+    const fillClipboard = (copyEvent) => {
+      copyEvent.clipboardData.setData('text/plain', plainText);
+      if (htmlText) copyEvent.clipboardData.setData('text/html', htmlText);
+      copyEvent.preventDefault();
+    };
+    document.addEventListener('copy', fillClipboard, { once: true });
+    const copySucceeded = document.execCommand('copy');
+    document.removeEventListener('copy', fillClipboard);
+    return copySucceeded;
+  }
+
+  /**
+   * Put text (and optionally HTML) on the clipboard.
+   * Tries the modern Clipboard API first, then falls back to the copy command.
+   */
+  async function writeToClipboard(plainText, htmlText) {
+    try {
+      if (htmlText && window.ClipboardItem) {
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/plain': new Blob([plainText], { type: 'text/plain' }),
+          'text/html': new Blob([htmlText], { type: 'text/html' }),
+        })]);
+      } else {
+        await navigator.clipboard.writeText(plainText);
+      }
+      return true;
+    } catch (clipboardError) {
+      return copyWithCopyCommand(plainText, htmlText);
+    }
+  }
+
+  // Which column (if any) holds the bit pattern, so Excel keeps its leading zeros.
+  function getBitPatternColumnIndex() {
+    if (!includeBitPatternCheckbox.checked) return -1;
+    return includeRowNumberCheckbox.checked ? 1 : 0;
+  }
+
+  // One handler for all three copy buttons; the data attribute picks the format.
+  copyButtons.forEach((copyButton) => {
+    copyButton.addEventListener('click', async () => {
+      const copyFormat = copyButton.dataset.copyFormat;
+      let plainText;
+      let htmlText = null;
+
+      if (copyFormat === 'markdown') {
+        // Markdown is plain text only.
+        plainText = gridToMarkdown(currentTableGrid);
+      } else if (copyFormat === 'excel') {
+        // Excel reads tab-separated text cell by cell; HTML is added for formatting.
+        plainText = gridToTabSeparated(currentTableGrid, getBitPatternColumnIndex());
+        htmlText = gridToHtmlTable(currentTableGrid);
+      } else {
+        // Word pastes the HTML as a real table; tab-separated text is the fallback.
+        plainText = gridToTabSeparated(currentTableGrid, -1);
+        htmlText = gridToHtmlTable(currentTableGrid);
+      }
+
+      const copySucceeded = await writeToClipboard(plainText, htmlText);
+      copyStatus.textContent = copySucceeded
+        ? `Copied for ${copyButton.textContent.replace(/^Copy (as |for )/, '')}`
+        : 'Your browser blocked the clipboard. Try again in another browser.';
+    });
+  });
+
+  /**
+   * Read fields from the query string, e.g.
+   *   ?Firstname=Yes,No&Address=Yes,No&Workaddress=Set,Not set
+   * Each parameter is one field: the name is the field name, the value is
+   * "State A,State B". Plain spaces, + and %20 all work. A field without a value
+   * (e.g. ?Firstname) gets Yes/No. Returns null when there is no query string.
+   */
+  function readFieldsFromQueryString() {
+    const rawQuery = window.location.search.replace(/^\?/, '');
+    if (rawQuery.trim() === '') return null;
+
+    // Turn + into a space, then decode %20 and other escapes; keep raw text if decoding fails.
+    const decodeQueryPart = (queryPart) => {
+      const withSpaces = queryPart.replace(/\+/g, ' ');
+      try { return decodeURIComponent(withSpaces); } catch (decodeError) { return withSpaces; }
+    };
+
+    const queryFields = [];
+    rawQuery.split('&').forEach((queryPair) => {
+      if (queryPair === '' || queryFields.length >= MAX_FIELD_COUNT) return;
+      const equalsPosition = queryPair.indexOf('=');
+      const rawName = equalsPosition === -1 ? queryPair : queryPair.slice(0, equalsPosition);
+      const rawStates = equalsPosition === -1 ? '' : queryPair.slice(equalsPosition + 1);
+
+      const fieldName = decodeQueryPart(rawName).trim();
+      if (fieldName === '') return;
+      // Split on the first comma only, so state B may itself contain commas.
+      const decodedStates = decodeQueryPart(rawStates);
+      const commaPosition = decodedStates.indexOf(',');
+      const stateA = commaPosition === -1 ? decodedStates : decodedStates.slice(0, commaPosition);
+      const stateB = commaPosition === -1 ? '' : decodedStates.slice(commaPosition + 1);
+
+      queryFields.push({ name: fieldName, stateA: stateA.trim(), stateB: stateB.trim() });
+    });
+    return queryFields.length ? queryFields : null;
+  }
+
+  // Copy the link as plain text, with spaces kept as spaces.
+  copyLinkButton.addEventListener('click', async () => {
+    const copySucceeded = await writeToClipboard(pageLinkOutput.value, null);
+    if (!copySucceeded) pageLinkOutput.select();
+    linkCopyStatus.textContent = copySucceeded ? 'Copied' : 'Selected. Press Ctrl+C to copy.';
+  });
+
+  // Fields from the address replace the built-in example.
+  const fieldsFromQueryString = readFieldsFromQueryString();
+  if (fieldsFromQueryString) fieldList = fieldsFromQueryString;
+
+  // First render
+  renderFieldEditor();
+  refreshOutput();
+</script>
+
+</body>
+</html>
