@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Color picker and contrast checker</title>
+<style>
+  /* Same colour scheme and layout as flag-decoder.html. */
+  :root {
+    --page-background: #f3f5f8;
+    --panel-background: #ffffff;
+    --text-color: #1b2230;
+    --muted-text-color: #5b6477;
+    --border-color: #d6dbe4;
+    --accent-color: #2457d6;
+    --accent-text-color: #ffffff;
+    --pass-background: #e3f3e8;
+    --pass-text-color: #17512c;
+    --fail-background: #fbe4e4;
+    --fail-text-color: #7d1f1f;
+    --warning-background: #fff3d6;
+    --warning-text-color: #6b4a00;
+    --body-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono-font: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page-background: #13161c;
+      --panel-background: #1c2028;
+      --text-color: #e5e8ee;
+      --muted-text-color: #98a1b3;
+      --border-color: #323947;
+      --accent-color: #7ea1ff;
+      --accent-text-color: #0f1420;
+      --pass-background: #1d3828;
+      --pass-text-color: #a9e4bd;
+      --fail-background: #41201f;
+      --fail-text-color: #f4b6b4;
+      --warning-background: #3a3018;
+      --warning-text-color: #f1d48a;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page-background: #13161c;
+    --panel-background: #1c2028;
+    --text-color: #e5e8ee;
+    --muted-text-color: #98a1b3;
+    --border-color: #323947;
+    --accent-color: #7ea1ff;
+    --accent-text-color: #0f1420;
+    --pass-background: #1d3828;
+    --pass-text-color: #a9e4bd;
+    --fail-background: #41201f;
+    --fail-text-color: #f4b6b4;
+    --warning-background: #3a3018;
+    --warning-text-color: #f1d48a;
+    color-scheme: dark;
+  }
+
+  /* Sections and grids set their own display, which would otherwise beat the hidden attribute. */
+  [hidden] { display: none !important; }
+
+  body {
+    margin: 0;
+    background: var(--page-background);
+    color: var(--text-color);
+    font-family: var(--body-font);
+    font-size: 15px;
+  }
+  main {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 24px 16px 40px;
+    display: grid;
+    gap: 18px;
+  }
+  h1 { margin: 0; font-size: 24px; text-wrap: balance; }
+  h2 { margin: 0; font-size: 16px; }
+  h3 { margin: 0; font-size: 14px; }
+  .intro { margin: 6px 0 0; color: var(--muted-text-color); max-width: 65ch; }
+
+  section {
+    background: var(--panel-background);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 0;
+    display: grid;
+    gap: 12px;
+  }
+  .section-header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+
+  input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background: var(--page-background);
+    color: var(--text-color);
+    font: inherit;
+  }
+  input.color-text { font-family: var(--mono-font); }
+  input.color-text.invalid { border-color: #d64545; }
+  input[type="color"] { flex: none; width: 56px; height: 36px; padding: 2px; border: 1px solid var(--border-color); border-radius: 5px; background: var(--page-background); cursor: pointer; }
+  input:focus-visible, button:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 1px; }
+
+  button {
+    padding: 8px 14px;
+    border: 1px solid var(--accent-color);
+    border-radius: 5px;
+    background: var(--accent-color);
+    color: var(--accent-text-color);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--accent-color); }
+  button.small-button { padding: 3px 9px; font-size: 13px; font-weight: 500; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .muted { color: var(--muted-text-color); font-variant-numeric: tabular-nums; }
+  .small { font-size: 13px; }
+  .warning-message { background: var(--warning-background); color: var(--warning-text-color); border-radius: 5px; padding: 8px 10px; margin: 0; }
+
+  /* A square pattern behind a swatch, so transparency can be seen. */
+  .swatch-backing {
+    background-color: #ffffff;
+    background-image: linear-gradient(45deg, #c4c9d2 25%, transparent 25%, transparent 75%, #c4c9d2 75%), linear-gradient(45deg, #c4c9d2 25%, transparent 25%, transparent 75%, #c4c9d2 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 8px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .swatch-fill { height: 100%; }
+
+  .picker-layout { display: grid; grid-template-columns: minmax(150px, 220px) minmax(0, 1fr); gap: 16px; }
+  .large-swatch { min-height: 150px; }
+  .picker-controls { display: grid; gap: 10px; min-width: 0; }
+  .input-row { display: flex; gap: 8px; align-items: center; min-width: 0; }
+
+  /* Sliders: the track shows what moving the handle would give. */
+  .slider-row { display: grid; grid-template-columns: 82px minmax(0, 1fr) 52px; gap: 10px; align-items: center; }
+  .slider-value { font-family: var(--mono-font); font-size: 13px; text-align: right; }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 14px;
+    margin: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 7px;
+    background: var(--slider-track, var(--border-color));
+    cursor: pointer;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    background: #1b2230;
+    box-shadow: 0 0 2px #000000;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border: 2px solid #ffffff;
+    border-radius: 50%;
+    background: #1b2230;
+    box-shadow: 0 0 2px #000000;
+  }
+
+  /* One row per format: name, value, copy button. */
+  .result-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border-color); border-radius: 5px; }
+  .result-list li {
+    display: grid;
+    grid-template-columns: 90px minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 10px;
+  }
+  .result-list li + li { border-top: 1px solid var(--border-color); }
+  .result-name { color: var(--muted-text-color); font-size: 13px; }
+  .result-value { font-family: var(--mono-font); overflow-wrap: anywhere; }
+
+  .contrast-inputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .contrast-field { display: grid; gap: 4px; min-width: 0; }
+  .contrast-ratio { font-family: var(--mono-font); font-size: 34px; font-weight: 700; margin: 0; }
+
+  .check-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; margin: 0; }
+  .check-list div { border: 1px solid var(--border-color); border-radius: 5px; padding: 8px 10px; }
+  .check-list dt { font-size: 13px; color: var(--muted-text-color); }
+  .check-list dd { margin: 3px 0 0; font-weight: 600; }
+  .check-list .passes { background: var(--pass-background); color: var(--pass-text-color); }
+  .check-list .fails { background: var(--fail-background); color: var(--fail-text-color); }
+  .check-list .passes dt, .check-list .fails dt { color: inherit; }
+
+  /* The preview uses the checked colors, whatever the page's theme is. */
+  .contrast-preview { border: 1px solid var(--border-color); border-radius: 5px; padding: 16px; display: grid; gap: 10px; overflow-wrap: anywhere; }
+  .preview-normal { margin: 0; font-size: 16px; }
+  .preview-large { margin: 0; font-size: 24px; }
+  .preview-control { width: fit-content; padding: 6px 14px; border: 2px solid currentColor; border-radius: 5px; font-weight: 600; }
+
+  .suggestion-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border-color); border-radius: 5px; }
+  .suggestion-list li {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 10px;
+  }
+  .suggestion-list li + li { border-top: 1px solid var(--border-color); }
+  .small-swatch { width: 24px; height: 24px; border: 1px solid var(--border-color); border-radius: 4px; }
+
+  /* Phones: 16px inputs stop iOS from zooming in on focus; columns stack. */
+  @media (max-width: 640px) {
+    input[type="text"] { font-size: 16px; }
+    .picker-layout { grid-template-columns: minmax(0, 1fr); }
+    .large-swatch { min-height: 90px; }
+    .section-header .actions span:empty { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Color picker and contrast checker</h1>
+    <p class="intro">Pick a color or paste one in any CSS format to convert it. Then check two colors against the WCAG contrast rules, and get the closest colors that pass.</p>
+  </header>
+
+  <!-- The picked color -->
+  <section aria-labelledby="pickerHeading">
+    <div class="section-header">
+      <h2 id="pickerHeading">Color</h2>
+      <button type="button" class="secondary" id="eyeDropperButton" hidden>Pick from screen</button>
+    </div>
+    <div class="picker-layout">
+      <div class="swatch-backing large-swatch"><div class="swatch-fill" id="pickedSwatch"></div></div>
+      <div class="picker-controls">
+        <div class="input-row">
+          <input type="color" id="pickedNativeInput" aria-label="Open the color chooser">
+          <input type="text" class="color-text" id="pickedTextInput" autocomplete="off" spellcheck="false" aria-label="Color in any CSS format" aria-describedby="pickedHint">
+        </div>
+        <label class="slider-row"><span>Hue</span><input type="range" id="hueSlider" min="0" max="360" step="1"><span class="slider-value" id="hueValue"></span></label>
+        <label class="slider-row"><span>Saturation</span><input type="range" id="saturationSlider" min="0" max="100" step="1"><span class="slider-value" id="saturationValue"></span></label>
+        <label class="slider-row"><span>Lightness</span><input type="range" id="lightnessSlider" min="0" max="100" step="1"><span class="slider-value" id="lightnessValue"></span></label>
+        <label class="slider-row"><span>Opacity</span><input type="range" id="alphaSlider" min="0" max="100" step="1"><span class="slider-value" id="alphaValue"></span></label>
+      </div>
+    </div>
+    <div class="muted small" id="pickedHint">Takes #2457d6, #25d, rgb(36, 87, 214), 36 87 214, hsl(223, 71%, 49%), oklch(49% 0.19 264), color names such as rebeccapurple, and anything else your browser reads as a CSS color.</div>
+    <p class="warning-message" id="pickedMessage" hidden></p>
+  </section>
+
+  <!-- The picked color in every format -->
+  <section aria-labelledby="formatsHeading">
+    <div class="section-header">
+      <h2 id="formatsHeading">Formats</h2>
+      <span class="muted" id="copyStatus" aria-live="polite"></span>
+    </div>
+    <ul class="result-list" id="formatList"></ul>
+  </section>
+
+  <!-- Two colors against the WCAG rules -->
+  <section aria-labelledby="contrastHeading">
+    <div class="section-header">
+      <h2 id="contrastHeading">Contrast checker</h2>
+      <button type="button" class="secondary" id="swapColorsButton">Swap colors</button>
+    </div>
+    <div class="contrast-inputs">
+      <div class="contrast-field">
+        <span class="muted small">Text color</span>
+        <div class="input-row">
+          <input type="color" id="textNativeInput" aria-label="Open the color chooser for the text color">
+          <input type="text" class="color-text" id="textColorInput" autocomplete="off" spellcheck="false" aria-label="Text color">
+        </div>
+        <button type="button" class="secondary small-button" id="usePickedForTextButton" style="width:fit-content">Use picked color</button>
+      </div>
+      <div class="contrast-field">
+        <span class="muted small">Background color</span>
+        <div class="input-row">
+          <input type="color" id="backgroundNativeInput" aria-label="Open the color chooser for the background color">
+          <input type="text" class="color-text" id="backgroundColorInput" autocomplete="off" spellcheck="false" aria-label="Background color">
+        </div>
+        <button type="button" class="secondary small-button" id="usePickedForBackgroundButton" style="width:fit-content">Use picked color</button>
+      </div>
+    </div>
+    <p class="warning-message" id="contrastMessage" hidden></p>
+
+    <div id="contrastResults" style="display:grid;gap:12px">
+      <div class="section-header">
+        <p class="contrast-ratio" id="contrastRatioOutput" aria-live="polite"></p>
+        <button type="button" class="secondary small-button" id="copyRatioButton">Copy ratio</button>
+      </div>
+      <dl class="check-list" id="checkList"></dl>
+      <div class="contrast-preview" id="contrastPreview">
+        <p class="preview-normal">Normal text: the quick brown fox jumps over the lazy dog.</p>
+        <p class="preview-large">Large text: the quick brown fox.</p>
+        <div class="preview-control">Button or input border</div>
+      </div>
+      <div class="muted small">Large text is at least 24 px, or 18.66 px when bold. WCAG has no AAA level for buttons and icons. The ratio is rounded down, so a value that only just fails does not look like a pass.</div>
+      <h3 id="suggestionsHeading">Closest colors that pass</h3>
+      <ul class="suggestion-list" id="suggestionList" aria-labelledby="suggestionsHeading"></ul>
+      <div class="muted small">These keep the hue and change the lightness as little as possible, measured in OKLCH. Very saturated colors can also lose some saturation.</div>
+    </div>
+  </section>
+
+  <!-- Link that reopens the page with the colors filled in -->
+  <section aria-labelledby="linkHeading">
+    <div class="section-header">
+      <h2 id="linkHeading">Link to these colors</h2>
+      <div class="actions">
+        <span class="muted" id="linkCopyStatus" aria-live="polite"></span>
+        <button type="button" class="secondary" id="copyLinkButton">Copy link</button>
+      </div>
+    </div>
+    <input type="text" id="pageLinkOutput" readonly spellcheck="false" aria-label="Link to this page with the current colors">
+  </section>
+</main>
+
+<script>
+  const DEFAULT_PICKED_COLOR = '#2457d6';
+  const DEFAULT_TEXT_COLOR = '#5b6477';
+  const DEFAULT_BACKGROUND_COLOR = '#ffffff';
+  const WHITE = { red: 255, green: 255, blue: 255, alpha: 1 };
+
+  // WCAG 2.2 minimum contrast ratios.
+  const CONTRAST_CHECKS = [
+    { name: 'Normal text, AA', minimumRatio: 4.5 },
+    { name: 'Normal text, AAA', minimumRatio: 7 },
+    { name: 'Large text, AA', minimumRatio: 3 },
+    { name: 'Large text, AAA', minimumRatio: 4.5 },
+    { name: 'Buttons and icons, AA', minimumRatio: 3 },
+  ];
+
+  // The two targets that the suggestions aim for.
+  const SUGGESTION_TARGETS = [
+    { name: 'AA', minimumRatio: 4.5 },
+    { name: 'AAA', minimumRatio: 7 },
+  ];
+
+  // How finely the suggestions search for a passing lightness in OKLCH.
+  const LIGHTNESS_SEARCH_STEP = 0.005;
+  const LIGHTNESS_SEARCH_STEPS = 200;
+
+  // How far outside 0-1 a linear RGB channel may be and still count as in range.
+  const GAMUT_TOLERANCE = 0.0001;
+  // CSS treats 100% chroma in oklch() as 0.4.
+  const OKLCH_FULL_CHROMA = 0.4;
+
+  // Page elements we read from or write to.
+  const pickedSwatch = document.getElementById('pickedSwatch');
+  const pickedNativeInput = document.getElementById('pickedNativeInput');
+  const pickedTextInput = document.getElementById('pickedTextInput');
+  const pickedMessage = document.getElementById('pickedMessage');
+  const eyeDropperButton = document.getElementById('eyeDropperButton');
+  const hueSlider = document.getElementById('hueSlider');
+  const saturationSlider = document.getElementById('saturationSlider');
+  const lightnessSlider = document.getElementById('lightnessSlider');
+  const alphaSlider = document.getElementById('alphaSlider');
+  const hueValue = document.getElementById('hueValue');
+  const saturationValue = document.getElementById('saturationValue');
+  const lightnessValue = document.getElementById('lightnessValue');
+  const alphaValue = document.getElementById('alphaValue');
+  const formatList = document.getElementById('formatList');
+  const copyStatus = document.getElementById('copyStatus');
+  const textColorInput = document.getElementById('textColorInput');
+  const textNativeInput = document.getElementById('textNativeInput');
+  const backgroundColorInput = document.getElementById('backgroundColorInput');
+  const backgroundNativeInput = document.getElementById('backgroundNativeInput');
+  const usePickedForTextButton = document.getElementById('usePickedForTextButton');
+  const usePickedForBackgroundButton = document.getElementById('usePickedForBackgroundButton');
+  const swapColorsButton = document.getElementById('swapColorsButton');
+  const contrastMessage = document.getElementById('contrastMessage');
+  const contrastResults = document.getElementById('contrastResults');
+  const contrastRatioOutput = document.getElementById('contrastRatioOutput');
+  const copyRatioButton = document.getElementById('copyRatioButton');
+  const checkList = document.getElementById('checkList');
+  const contrastPreview = document.getElementById('contrastPreview');
+  const suggestionList = document.getElementById('suggestionList');
+  const pageLinkOutput = document.getElementById('pageLinkOutput');
+  const copyLinkButton = document.getElementById('copyLinkButton');
+  const linkCopyStatus = document.getElementById('linkCopyStatus');
+
+  // The picked color: whole numbers 0-255 for the channels and 0-1 for alpha.
+  let pickedColor = null;
+
+  // The slider positions. Kept apart from the color, because a gray has no hue
+  // of its own and the hue should not jump when saturation passes through zero.
+  let sliderHue = 0;
+  let sliderSaturation = 0;
+  let sliderLightness = 0;
+
+  /* ---------- Small number helpers ---------- */
+
+  const clamp = (value, smallest, largest) => Math.min(largest, Math.max(smallest, value));
+  /** A number with at most this many decimals and no trailing zeros. */
+  const trimNumber = (value, decimals) => String(Number(value.toFixed(decimals)));
+
+  /* ---------- Converting between color models ---------- */
+
+  /** Red, green and blue from hue (0-360), saturation and lightness (0-100). */
+  function hslToRgb(hue, saturation, lightness) {
+    const saturationPart = saturation / 100;
+    const lightnessPart = lightness / 100;
+    const chroma = saturationPart * Math.min(lightnessPart, 1 - lightnessPart);
+    const channel = (offset) => {
+      const position = (offset + hue / 30) % 12;
+      return Math.round(255 * (lightnessPart - chroma * Math.max(-1, Math.min(position - 3, 9 - position, 1))));
+    };
+    return { red: channel(0), green: channel(8), blue: channel(4) };
+  }
+
+  /** Hue (0-360), saturation and lightness (0-100) from red, green and blue. */
+  function rgbToHsl({ red, green, blue }) {
+    const [redPart, greenPart, bluePart] = [red / 255, green / 255, blue / 255];
+    const largest = Math.max(redPart, greenPart, bluePart);
+    const smallest = Math.min(redPart, greenPart, bluePart);
+    const spread = largest - smallest;
+    const lightnessPart = (largest + smallest) / 2;
+
+    let hue = 0;
+    if (spread > 0) {
+      if (largest === redPart) hue = ((greenPart - bluePart) / spread + 6) % 6;
+      else if (largest === greenPart) hue = (bluePart - redPart) / spread + 2;
+      else hue = (redPart - greenPart) / spread + 4;
+    }
+    const saturationPart = spread === 0 ? 0 : spread / (1 - Math.abs(2 * lightnessPart - 1));
+    return { hue: hue * 60, saturation: saturationPart * 100, lightness: lightnessPart * 100 };
+  }
+
+  /** A sRGB channel (0-1) with its gamma removed. */
+  function toLinearChannel(channelPart) {
+    return channelPart <= 0.04045 ? channelPart / 12.92 : ((channelPart + 0.055) / 1.055) ** 2.4;
+  }
+
+  /** A linear channel (0-1) with sRGB gamma added. */
+  function fromLinearChannel(linearPart) {
+    return linearPart <= 0.0031308 ? 12.92 * linearPart : 1.055 * linearPart ** (1 / 2.4) - 0.055;
+  }
+
+  /** OKLCH lightness (0-1), chroma and hue from red, green and blue. */
+  function rgbToOklch({ red, green, blue }) {
+    const linearRed = toLinearChannel(red / 255);
+    const linearGreen = toLinearChannel(green / 255);
+    const linearBlue = toLinearChannel(blue / 255);
+
+    const longCone = Math.cbrt(0.4122214708 * linearRed + 0.5363325363 * linearGreen + 0.0514459929 * linearBlue);
+    const mediumCone = Math.cbrt(0.2119034982 * linearRed + 0.6806995451 * linearGreen + 0.1073969566 * linearBlue);
+    const shortCone = Math.cbrt(0.0883024619 * linearRed + 0.2817188376 * linearGreen + 0.6299787005 * linearBlue);
+
+    const lightness = 0.2104542553 * longCone + 0.793617785 * mediumCone - 0.0040720468 * shortCone;
+    const axisA = 1.9779984951 * longCone - 2.428592205 * mediumCone + 0.4505937099 * shortCone;
+    const axisB = 0.0259040371 * longCone + 0.7827717662 * mediumCone - 0.808675766 * shortCone;
+
+    const chroma = Math.hypot(axisA, axisB);
+    // Grays have no real hue, only rounding noise.
+    if (chroma < 0.0005) return { lightness, chroma: 0, hue: 0 };
+    return { lightness, chroma, hue: ((Math.atan2(axisB, axisA) * 180) / Math.PI + 360) % 360 };
+  }
+
+  /** Linear red, green and blue from OKLCH. They can fall outside 0-1. */
+  function oklchToLinear(lightness, chroma, hue) {
+    const hueRadians = (hue * Math.PI) / 180;
+    const axisA = chroma * Math.cos(hueRadians);
+    const axisB = chroma * Math.sin(hueRadians);
+
+    const longCone = (lightness + 0.3963377774 * axisA + 0.2158037573 * axisB) ** 3;
+    const mediumCone = (lightness - 0.1055613458 * axisA - 0.0638541728 * axisB) ** 3;
+    const shortCone = (lightness - 0.0894841775 * axisA - 1.291485548 * axisB) ** 3;
+
+    return [
+      4.0767416621 * longCone - 3.3077115913 * mediumCone + 0.2309699292 * shortCone,
+      -1.2684380046 * longCone + 2.6097574011 * mediumCone - 0.3413193965 * shortCone,
+      -0.0041960863 * longCone - 0.7034186147 * mediumCone + 1.707614701 * shortCone,
+    ];
+  }
+
+  const isInGamut = (linearChannels) => linearChannels.every((channel) => channel >= -GAMUT_TOLERANCE && channel <= 1 + GAMUT_TOLERANCE);
+
+  /**
+   * Red, green and blue from OKLCH. A color the screen range cannot show keeps
+   * its lightness and hue and loses chroma until it fits. wasOutOfRange says so.
+   */
+  function oklchToRgb(lightness, chroma, hue) {
+    const usedLightness = clamp(lightness, 0, 1);
+    let usedChroma = Math.max(0, chroma);
+    let wasOutOfRange = false;
+
+    if (!isInGamut(oklchToLinear(usedLightness, usedChroma, hue))) {
+      wasOutOfRange = true;
+      let lowChroma = 0;
+      let highChroma = usedChroma;
+      for (let round = 0; round < 20; round++) {
+        const middleChroma = (lowChroma + highChroma) / 2;
+        if (isInGamut(oklchToLinear(usedLightness, middleChroma, hue))) lowChroma = middleChroma;
+        else highChroma = middleChroma;
+      }
+      usedChroma = lowChroma;
+    }
+
+    const [red, green, blue] = oklchToLinear(usedLightness, usedChroma, hue)
+      .map((channel) => Math.round(255 * fromLinearChannel(clamp(channel, 0, 1))));
+    return { red, green, blue, wasOutOfRange };
+  }
+
+  /* ---------- Reading color text ---------- */
+
+  /** #rgb, #rgba, #rrggbb and #rrggbbaa, with or without the #. */
+  function parseHexColor(colorText) {
+    const hexMatch = colorText.match(/^#?([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
+    if (!hexMatch) return null;
+    let hexDigits = hexMatch[1];
+    if (hexDigits.length <= 4) hexDigits = [...hexDigits].map((digit) => digit + digit).join('');
+    const channelAt = (start) => parseInt(hexDigits.slice(start, start + 2), 16);
+    return {
+      red: channelAt(0),
+      green: channelAt(2),
+      blue: channelAt(4),
+      alpha: hexDigits.length === 8 ? channelAt(6) / 255 : 1,
+    };
+  }
+
+  /** Read a number or percentage. fullValue is what 100% means. Returns null when it is neither. */
+  function readNumberOrPercent(numberText, fullValue) {
+    if (/^none$/i.test(numberText)) return 0;
+    const numberMatch = numberText.match(/^([+-]?(?:\d+\.?\d*|\.\d+))(%?)$/);
+    if (!numberMatch) return null;
+    const numberValue = Number(numberMatch[1]);
+    return numberMatch[2] ? (numberValue / 100) * fullValue : numberValue;
+  }
+
+  /** Read a hue in plain numbers or degrees. Returns null for other units. */
+  function readHue(hueText) {
+    if (/^none$/i.test(hueText)) return 0;
+    const hueMatch = hueText.match(/^([+-]?(?:\d+\.?\d*|\.\d+))(deg)?$/i);
+    if (!hueMatch) return null;
+    return ((Number(hueMatch[1]) % 360) + 360) % 360;
+  }
+
+  /** Read the optional alpha at the end of a color function. Returns null when it is not a number. */
+  function readAlpha(alphaText) {
+    if (alphaText === undefined) return 1;
+    const alphaValueRead = readNumberOrPercent(alphaText, 1);
+    return alphaValueRead === null ? null : clamp(alphaValueRead, 0, 1);
+  }
+
+  /**
+   * rgb(), hsl() and oklch(), with commas or spaces, and three plain numbers as
+   * RGB. Parsed here rather than by the browser so alpha and rounding stay exact.
+   * Returns null for anything else, which then goes to the browser.
+   */
+  function parseFunctionColor(colorText) {
+    if (/^\d{1,3}[\s,]+\d{1,3}[\s,]+\d{1,3}$/.test(colorText)) {
+      const [red, green, blue] = colorText.split(/[\s,]+/).map(Number);
+      if (red > 255 || green > 255 || blue > 255) return null;
+      return { red, green, blue, alpha: 1 };
+    }
+
+    const functionMatch = colorText.match(/^(rgba?|hsla?|oklch)\(\s*(.+?)\s*\)$/i);
+    if (!functionMatch) return null;
+    const functionName = functionMatch[1].toLowerCase();
+    const argumentTexts = functionMatch[2].split(/[\s,/]+/);
+    if (argumentTexts.length < 3 || argumentTexts.length > 4) return null;
+    const alpha = readAlpha(argumentTexts[3]);
+    if (alpha === null) return null;
+
+    if (functionName.startsWith('rgb')) {
+      const channels = argumentTexts.slice(0, 3).map((channelText) => readNumberOrPercent(channelText, 255));
+      if (channels.includes(null)) return null;
+      const [red, green, blue] = channels.map((channel) => Math.round(clamp(channel, 0, 255)));
+      return { red, green, blue, alpha };
+    }
+
+    if (functionName.startsWith('hsl')) {
+      const hue = readHue(argumentTexts[0]);
+      const saturation = readNumberOrPercent(argumentTexts[1], 100);
+      const lightness = readNumberOrPercent(argumentTexts[2], 100);
+      if (hue === null || saturation === null || lightness === null) return null;
+      return { ...hslToRgb(hue, clamp(saturation, 0, 100), clamp(lightness, 0, 100)), alpha };
+    }
+
+    const lightness = readNumberOrPercent(argumentTexts[0], 1);
+    const chroma = readNumberOrPercent(argumentTexts[1], OKLCH_FULL_CHROMA);
+    const hue = readHue(argumentTexts[2]);
+    if (lightness === null || chroma === null || hue === null) return null;
+    return { ...oklchToRgb(lightness, chroma, hue), alpha };
+  }
+
+  const canvasContext = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+  canvasContext.canvas.width = 1;
+  canvasContext.canvas.height = 1;
+
+  /**
+   * Anything else the browser reads as a color, such as names, hwb() and lab().
+   * A canvas ignores color text it cannot read, so two different starting colors
+   * ending up the same shows that the text was read.
+   */
+  function parseBrowserColor(colorText) {
+    // The canvas would answer with its own black, which is not what this means on a real page.
+    if (/^currentcolor$/i.test(colorText)) return null;
+    canvasContext.fillStyle = '#010203';
+    canvasContext.fillStyle = colorText;
+    const afterFirstTry = canvasContext.fillStyle;
+    canvasContext.fillStyle = '#030201';
+    canvasContext.fillStyle = colorText;
+    if (canvasContext.fillStyle !== afterFirstTry) return null;
+
+    canvasContext.clearRect(0, 0, 1, 1);
+    canvasContext.fillRect(0, 0, 1, 1);
+    const [red, green, blue, alphaByte] = canvasContext.getImageData(0, 0, 1, 1).data;
+    return { red, green, blue, alpha: alphaByte / 255 };
+  }
+
+  /** Read color text in any supported format. Returns null when it cannot be read. */
+  function parseColorText(rawText) {
+    const colorText = rawText.trim().replace(/;$/, '').trim();
+    if (colorText === '') return null;
+    return parseHexColor(colorText) ?? parseFunctionColor(colorText) ?? parseBrowserColor(colorText);
+  }
+
+  /* ---------- Writing color text ---------- */
+
+  const byteToHex = (byteValue) => byteValue.toString(16).padStart(2, '0');
+
+  /** #rrggbb, ignoring alpha. */
+  function formatHexOpaque({ red, green, blue }) {
+    return `#${byteToHex(red)}${byteToHex(green)}${byteToHex(blue)}`;
+  }
+
+  /** #rrggbb, or #rrggbbaa when the color is see-through. */
+  function formatHex(color) {
+    const alphaDigits = color.alpha < 1 ? byteToHex(Math.round(color.alpha * 255)) : '';
+    return formatHexOpaque(color) + alphaDigits;
+  }
+
+  /** Every format as [name, value] rows. */
+  function buildFormatRows(color) {
+    const { red, green, blue, alpha } = color;
+    const isOpaque = alpha >= 1;
+    const alphaText = trimNumber(alpha, 3);
+    const hsl = rgbToHsl(color);
+    const oklch = rgbToOklch(color);
+    const hueText = trimNumber(hsl.hue, 1);
+    const saturationText = trimNumber(hsl.saturation, 1);
+    const lightnessText = trimNumber(hsl.lightness, 1);
+    const whitenessText = trimNumber((Math.min(red, green, blue) / 255) * 100, 1);
+    const blacknessText = trimNumber(100 - (Math.max(red, green, blue) / 255) * 100, 1);
+    const spaceAlpha = isOpaque ? '' : ` / ${alphaText}`;
+
+    return [
+      ['HEX', formatHex(color)],
+      ['RGB', isOpaque ? `rgb(${red}, ${green}, ${blue})` : `rgba(${red}, ${green}, ${blue}, ${alphaText})`],
+      ['HSL', isOpaque ? `hsl(${hueText}, ${saturationText}%, ${lightnessText}%)` : `hsla(${hueText}, ${saturationText}%, ${lightnessText}%, ${alphaText})`],
+      ['HWB', `hwb(${hueText} ${whitenessText}% ${blacknessText}%${spaceAlpha})`],
+      ['OKLCH', `oklch(${trimNumber(oklch.lightness * 100, 2)}% ${trimNumber(oklch.chroma, 4)} ${trimNumber(oklch.hue, 2)}${spaceAlpha})`],
+    ];
+  }
+
+  /* ---------- Contrast ---------- */
+
+  /** How bright a color looks, as WCAG defines it. */
+  function relativeLuminance({ red, green, blue }) {
+    return 0.2126 * toLinearChannel(red / 255) + 0.7152 * toLinearChannel(green / 255) + 0.0722 * toLinearChannel(blue / 255);
+  }
+
+  /** The WCAG contrast ratio between two opaque colors, from 1 to 21. */
+  function contrastRatio(firstColor, secondColor) {
+    const firstLuminance = relativeLuminance(firstColor);
+    const secondLuminance = relativeLuminance(secondColor);
+    return (Math.max(firstLuminance, secondLuminance) + 0.05) / (Math.min(firstLuminance, secondLuminance) + 0.05);
+  }
+
+  /** A ratio rounded down to two decimals, so 4.499 never reads as 4.50. */
+  function formatRatio(ratio) {
+    return `${(Math.floor(ratio * 100) / 100).toFixed(2)}:1`;
+  }
+
+  /** What a see-through color looks like on top of an opaque one. */
+  function mixOver(topColor, bottomColor) {
+    const mixChannel = (channelName) => Math.round(topColor[channelName] * topColor.alpha + bottomColor[channelName] * (1 - topColor.alpha));
+    return { red: mixChannel('red'), green: mixChannel('green'), blue: mixChannel('blue'), alpha: 1 };
+  }
+
+  /**
+   * The color closest to startColor that reaches the ratio against fixedColor.
+   * Walks away from the starting lightness in both directions, one small step at
+   * a time. Returns null when neither direction gets there.
+   */
+  function findPassingColor(startColor, fixedColor, minimumRatio) {
+    if (contrastRatio(startColor, fixedColor) >= minimumRatio) return startColor;
+    const { lightness, chroma, hue } = rgbToOklch(startColor);
+    for (let step = 1; step <= LIGHTNESS_SEARCH_STEPS; step++) {
+      const distance = step * LIGHTNESS_SEARCH_STEP;
+      for (const tryLightness of [lightness - distance, lightness + distance]) {
+        if (tryLightness < 0 || tryLightness > 1) continue;
+        const { red, green, blue } = oklchToRgb(tryLightness, chroma, hue);
+        const candidate = { red, green, blue, alpha: 1 };
+        if (contrastRatio(candidate, fixedColor) >= minimumRatio) return candidate;
+      }
+    }
+    // The steps can stop just short of the ends, so try pure black and white as well.
+    return [{ red: 0, green: 0, blue: 0, alpha: 1 }, WHITE].find((endColor) => contrastRatio(endColor, fixedColor) >= minimumRatio) ?? null;
+  }
+
+  /* ---------- Drawing: picked color ---------- */
+
+  /** Draw [name, value] rows, each with a copy button. */
+  function renderFormatRows(formatRows) {
+    formatList.replaceChildren();
+    formatRows.forEach(([rowName, rowValue]) => {
+      const listItem = document.createElement('li');
+
+      const nameText = document.createElement('span');
+      nameText.className = 'result-name';
+      nameText.textContent = rowName;
+
+      const valueText = document.createElement('span');
+      valueText.className = 'result-value';
+      valueText.textContent = rowValue;
+
+      const copyButton = document.createElement('button');
+      copyButton.type = 'button';
+      copyButton.className = 'secondary small-button';
+      copyButton.textContent = 'Copy';
+      copyButton.dataset.copyValue = rowValue;
+      copyButton.setAttribute('aria-label', `Copy ${rowName}`);
+
+      listItem.append(nameText, valueText, copyButton);
+      formatList.appendChild(listItem);
+    });
+  }
+
+  /** Paint each slider's track with what moving its handle would give. */
+  function paintSliderTracks() {
+    const rgbAt = (hue, saturation, lightness) => {
+      const { red, green, blue } = hslToRgb(hue, saturation, lightness);
+      return `rgb(${red}, ${green}, ${blue})`;
+    };
+    const hueStops = [0, 60, 120, 180, 240, 300, 360].map((hue) => rgbAt(hue, 100, 50));
+    hueSlider.style.setProperty('--slider-track', `linear-gradient(to right, ${hueStops.join(', ')})`);
+    saturationSlider.style.setProperty('--slider-track', `linear-gradient(to right, ${rgbAt(sliderHue, 0, sliderLightness)}, ${rgbAt(sliderHue, 100, sliderLightness)})`);
+    lightnessSlider.style.setProperty('--slider-track', `linear-gradient(to right, #000000, ${rgbAt(sliderHue, sliderSaturation, 50)}, #ffffff)`);
+    const { red, green, blue } = pickedColor;
+    alphaSlider.style.setProperty('--slider-track', `linear-gradient(to right, rgba(${red}, ${green}, ${blue}, 0), rgb(${red}, ${green}, ${blue}))`);
+  }
+
+  /** Show the slider positions as numbers and put the handles in place. */
+  function renderSliders() {
+    hueSlider.value = String(Math.round(sliderHue));
+    saturationSlider.value = String(Math.round(sliderSaturation));
+    lightnessSlider.value = String(Math.round(sliderLightness));
+    alphaSlider.value = String(Math.round(pickedColor.alpha * 100));
+    hueValue.textContent = `${Math.round(sliderHue)}°`;
+    saturationValue.textContent = `${Math.round(sliderSaturation)}%`;
+    lightnessValue.textContent = `${Math.round(sliderLightness)}%`;
+    alphaValue.textContent = `${Math.round(pickedColor.alpha * 100)}%`;
+  }
+
+  /** Move the sliders to a new color. A gray keeps the hue the sliders already had. */
+  function moveSlidersTo(color) {
+    const { hue, saturation, lightness } = rgbToHsl(color);
+    if (saturation > 0) sliderHue = hue;
+    sliderSaturation = saturation;
+    sliderLightness = lightness;
+  }
+
+  /**
+   * Make a color the picked one and redraw. updateText is false while the user
+   * types in the box, so the page does not rewrite what they are typing.
+   */
+  function setPickedColor(newColor, { updateText = true, updateSliders = true } = {}) {
+    pickedColor = { red: newColor.red, green: newColor.green, blue: newColor.blue, alpha: newColor.alpha };
+    if (updateSliders) moveSlidersTo(pickedColor);
+
+    if (updateText) {
+      pickedTextInput.value = formatHex(pickedColor);
+      pickedTextInput.classList.remove('invalid');
+    }
+    pickedNativeInput.value = formatHexOpaque(pickedColor);
+    pickedSwatch.style.backgroundColor = `rgba(${pickedColor.red}, ${pickedColor.green}, ${pickedColor.blue}, ${pickedColor.alpha})`;
+
+    renderSliders();
+    paintSliderTracks();
+    renderFormatRows(buildFormatRows(pickedColor));
+    pageLinkOutput.value = buildPageLink();
+    copyStatus.textContent = '';
+    linkCopyStatus.textContent = '';
+  }
+
+  function showMessage(messageElement, messageText) {
+    messageElement.textContent = messageText;
+    messageElement.hidden = !messageText;
+  }
+
+  /** Read the color box. An unreadable value leaves the last good color in place. */
+  function refreshFromPickedText() {
+    const typedColor = parseColorText(pickedTextInput.value);
+    const textIsEmpty = pickedTextInput.value.trim() === '';
+    pickedTextInput.classList.toggle('invalid', !typedColor && !textIsEmpty);
+
+    if (!typedColor) {
+      showMessage(pickedMessage, textIsEmpty ? '' : `"${pickedTextInput.value.trim()}" could not be read as a color.`);
+      return;
+    }
+    showMessage(pickedMessage, typedColor.wasOutOfRange
+      ? 'This color is outside the sRGB range that the formats here describe, so the closest color with the same lightness and hue is shown.'
+      : '');
+    setPickedColor(typedColor, { updateText: false });
+  }
+
+  /** Read the sliders into the picked color. */
+  function refreshFromSliders() {
+    sliderHue = Number(hueSlider.value);
+    sliderSaturation = Number(saturationSlider.value);
+    sliderLightness = Number(lightnessSlider.value);
+    showMessage(pickedMessage, '');
+    setPickedColor(
+      { ...hslToRgb(sliderHue, sliderSaturation, sliderLightness), alpha: Number(alphaSlider.value) / 100 },
+      { updateSliders: false },
+    );
+  }
+
+  /* ---------- Drawing: contrast ---------- */
+
+  /** One suggestion row: a swatch, what it is, and a button to use it. */
+  function buildSuggestionRow(targetName, roleName, inputElement, suggestedColor, otherColor) {
+    const listItem = document.createElement('li');
+
+    const swatch = document.createElement('div');
+    swatch.className = 'small-swatch';
+    const description = document.createElement('span');
+
+    if (!suggestedColor) {
+      description.className = 'muted';
+      description.textContent = `${targetName}: no ${roleName} color reaches this against the other color.`;
+      listItem.append(swatch, description);
+      return listItem;
+    }
+
+    const suggestedHex = formatHexOpaque(suggestedColor);
+    swatch.style.backgroundColor = suggestedHex;
+    const ratioText = formatRatio(contrastRatio(suggestedColor, otherColor));
+    description.textContent = `${targetName}: ${roleName} ${suggestedHex} (${ratioText})`;
+    description.className = 'result-value';
+
+    const useButton = document.createElement('button');
+    useButton.type = 'button';
+    useButton.className = 'secondary small-button';
+    useButton.textContent = 'Use';
+    useButton.setAttribute('aria-label', `Use ${suggestedHex} as the ${roleName} color`);
+    useButton.addEventListener('click', () => {
+      inputElement.value = suggestedHex;
+      refreshContrast();
+    });
+
+    listItem.append(swatch, description, useButton);
+    return listItem;
+  }
+
+  /** Draw the suggestions, or say that the colors already pass. */
+  function renderSuggestions(textColor, backgroundColor) {
+    const currentRatio = contrastRatio(textColor, backgroundColor);
+    const missingTargets = SUGGESTION_TARGETS.filter((target) => currentRatio < target.minimumRatio);
+    suggestionList.replaceChildren();
+
+    if (missingTargets.length === 0) {
+      const listItem = document.createElement('li');
+      listItem.style.gridTemplateColumns = 'minmax(0, 1fr)';
+      listItem.textContent = 'These colors already pass AA and AAA for all text sizes.';
+      suggestionList.appendChild(listItem);
+      return;
+    }
+
+    missingTargets.forEach((target) => {
+      suggestionList.appendChild(buildSuggestionRow(target.name, 'text', textColorInput, findPassingColor(textColor, backgroundColor, target.minimumRatio), backgroundColor));
+      suggestionList.appendChild(buildSuggestionRow(target.name, 'background', backgroundColorInput, findPassingColor(backgroundColor, textColor, target.minimumRatio), textColor));
+    });
+  }
+
+  /** Draw one pass or fail box per WCAG rule. */
+  function renderChecks(ratio) {
+    checkList.replaceChildren();
+    CONTRAST_CHECKS.forEach((contrastCheck) => {
+      const passes = ratio >= contrastCheck.minimumRatio;
+      const checkBox = document.createElement('div');
+      checkBox.className = passes ? 'passes' : 'fails';
+      const checkName = document.createElement('dt');
+      checkName.textContent = `${contrastCheck.name} (${contrastCheck.minimumRatio}:1)`;
+      const checkResult = document.createElement('dd');
+      checkResult.textContent = passes ? 'Pass' : 'Fail';
+      checkBox.append(checkName, checkResult);
+      checkList.appendChild(checkBox);
+    });
+  }
+
+  /** Re-read both contrast boxes and redraw. */
+  function refreshContrast() {
+    const textColor = parseColorText(textColorInput.value);
+    const backgroundColor = parseColorText(backgroundColorInput.value);
+    pageLinkOutput.value = buildPageLink();
+    linkCopyStatus.textContent = '';
+    copyRatioButton.textContent = 'Copy ratio';
+
+    textColorInput.classList.toggle('invalid', !textColor);
+    backgroundColorInput.classList.toggle('invalid', !backgroundColor);
+    contrastResults.hidden = !textColor || !backgroundColor;
+    if (!textColor || !backgroundColor) {
+      const unreadableBox = !textColor ? 'text color' : 'background color';
+      showMessage(contrastMessage, `The ${unreadableBox} could not be read.`);
+      return;
+    }
+
+    textNativeInput.value = formatHexOpaque(textColor);
+    backgroundNativeInput.value = formatHexOpaque(backgroundColor);
+
+    // Contrast needs solid colors: the background goes on white, the text on the background.
+    const solidBackground = mixOver(backgroundColor, WHITE);
+    const solidText = mixOver(textColor, solidBackground);
+    const hasTransparency = textColor.alpha < 1 || backgroundColor.alpha < 1;
+    showMessage(contrastMessage, hasTransparency
+      ? `See-through colors are checked as they look: the background on white (${formatHexOpaque(solidBackground)}), the text on that (${formatHexOpaque(solidText)}).`
+      : '');
+
+    const ratio = contrastRatio(solidText, solidBackground);
+    contrastRatioOutput.textContent = formatRatio(ratio);
+    renderChecks(ratio);
+    contrastPreview.style.color = formatHexOpaque(solidText);
+    contrastPreview.style.backgroundColor = formatHexOpaque(solidBackground);
+    renderSuggestions(solidText, solidBackground);
+  }
+
+  /* ---------- Clipboard ---------- */
+
+  /** Put text on the clipboard, with the older copy command as a fallback. */
+  async function writeToClipboard(plainText) {
+    try {
+      await navigator.clipboard.writeText(plainText);
+      return true;
+    } catch (clipboardError) {
+      const fillClipboard = (copyEvent) => {
+        copyEvent.clipboardData.setData('text/plain', plainText);
+        copyEvent.preventDefault();
+      };
+      document.addEventListener('copy', fillClipboard, { once: true });
+      const copySucceeded = document.execCommand('copy');
+      document.removeEventListener('copy', fillClipboard);
+      return copySucceeded;
+    }
+  }
+
+  /* ---------- Link with the colors filled in ---------- */
+
+  /** A color box's value for the link: plain hex with no #, or nothing when unreadable. */
+  function colorForLink(colorInput) {
+    const readColor = parseColorText(colorInput.value);
+    return readColor ? formatHex(readColor).slice(1) : '';
+  }
+
+  /** This page's address with all three colors. */
+  function buildPageLink() {
+    const pageAddress = window.location.href.split(/[?#]/)[0];
+    const queryParts = [`color=${formatHex(pickedColor).slice(1)}`];
+    const textForLink = colorForLink(textColorInput);
+    const backgroundForLink = colorForLink(backgroundColorInput);
+    if (textForLink) queryParts.push(`text=${textForLink}`);
+    if (backgroundForLink) queryParts.push(`background=${backgroundForLink}`);
+    return `${pageAddress}?${queryParts.join('&')}`;
+  }
+
+  /* ---------- Events ---------- */
+
+  pickedTextInput.addEventListener('input', refreshFromPickedText);
+  [hueSlider, saturationSlider, lightnessSlider, alphaSlider].forEach((slider) => slider.addEventListener('input', refreshFromSliders));
+
+  // The browser's chooser has no opacity, so the current opacity is kept.
+  pickedNativeInput.addEventListener('input', () => {
+    showMessage(pickedMessage, '');
+    setPickedColor({ ...parseHexColor(pickedNativeInput.value), alpha: pickedColor.alpha });
+  });
+
+  // Only some browsers can pick a color from anywhere on the screen.
+  if ('EyeDropper' in window) {
+    eyeDropperButton.hidden = false;
+    eyeDropperButton.addEventListener('click', async () => {
+      try {
+        const eyeDropperResult = await new EyeDropper().open();
+        showMessage(pickedMessage, '');
+        setPickedColor(parseHexColor(eyeDropperResult.sRGBHex));
+      } catch (eyeDropperError) {
+        // Pressing Esc cancels the picking, which is not a problem to report.
+      }
+    });
+  }
+
+  [textColorInput, backgroundColorInput].forEach((colorInput) => colorInput.addEventListener('input', refreshContrast));
+
+  textNativeInput.addEventListener('input', () => {
+    textColorInput.value = textNativeInput.value;
+    refreshContrast();
+  });
+  backgroundNativeInput.addEventListener('input', () => {
+    backgroundColorInput.value = backgroundNativeInput.value;
+    refreshContrast();
+  });
+
+  usePickedForTextButton.addEventListener('click', () => {
+    textColorInput.value = formatHex(pickedColor);
+    refreshContrast();
+  });
+  usePickedForBackgroundButton.addEventListener('click', () => {
+    backgroundColorInput.value = formatHex(pickedColor);
+    refreshContrast();
+  });
+
+  swapColorsButton.addEventListener('click', () => {
+    [textColorInput.value, backgroundColorInput.value] = [backgroundColorInput.value, textColorInput.value];
+    refreshContrast();
+  });
+
+  // One listener on the list covers every copy button in it.
+  formatList.addEventListener('click', async (clickEvent) => {
+    const copyValue = clickEvent.target.dataset.copyValue;
+    if (copyValue === undefined) return;
+    const copySucceeded = await writeToClipboard(copyValue);
+    copyStatus.textContent = copySucceeded ? `Copied ${copyValue}` : 'Your browser blocked the clipboard.';
+  });
+
+  copyRatioButton.addEventListener('click', async () => {
+    const copySucceeded = await writeToClipboard(contrastRatioOutput.textContent);
+    copyRatioButton.textContent = copySucceeded ? 'Copied' : 'Clipboard blocked';
+  });
+
+  copyLinkButton.addEventListener('click', async () => {
+    const copySucceeded = await writeToClipboard(pageLinkOutput.value);
+    if (!copySucceeded) pageLinkOutput.select();
+    linkCopyStatus.textContent = copySucceeded ? 'Copied' : 'Selected. Press Ctrl+C to copy.';
+  });
+
+  /* ---------- Start ---------- */
+
+  const addressParameters = new URLSearchParams(window.location.search);
+
+  /** A color from the address when it can be read, otherwise the default. */
+  function colorFromAddress(parameterName, defaultColor) {
+    return parseColorText(addressParameters.get(parameterName) ?? '') ?? parseColorText(defaultColor);
+  }
+
+  textColorInput.value = formatHex(colorFromAddress('text', DEFAULT_TEXT_COLOR));
+  backgroundColorInput.value = formatHex(colorFromAddress('background', DEFAULT_BACKGROUND_COLOR));
+  setPickedColor(colorFromAddress('color', DEFAULT_PICKED_COLOR));
+  refreshContrast();
+</script>
+</body>
+</html>

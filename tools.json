@@ -8,5 +8,7 @@
   { "file": "timestamp-converter.html", "title": "Timestamp Converter" },
   { "file": "uuid-generator.html", "title": "UUID Generator" },
   { "file": "cron-explainer.html", "title": "Cron Explainer" },
-  { "file": "qr-code.html", "title": "QR Code Generator" }
+  { "file": "qr-code.html", "title": "QR Code Generator" },
+  { "file": "color-picker.html", "title": "Color Picker and Contrast Checker" },
+  { "file": "subnet-calculator.html", "title": "IP Subnet Calculator" }
 ]

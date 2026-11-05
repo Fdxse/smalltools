@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IP subnet calculator</title>
+<style>
+  /* Same colour scheme and layout as flag-decoder.html. */
+  :root {
+    --page-background: #f3f5f8;
+    --panel-background: #ffffff;
+    --text-color: #1b2230;
+    --muted-text-color: #5b6477;
+    --border-color: #d6dbe4;
+    --accent-color: #2457d6;
+    --accent-text-color: #ffffff;
+    --network-bits-background: #dfe8fd;
+    --pass-background: #e3f3e8;
+    --pass-text-color: #17512c;
+    --warning-background: #fff3d6;
+    --warning-text-color: #6b4a00;
+    --body-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono-font: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page-background: #13161c;
+      --panel-background: #1c2028;
+      --text-color: #e5e8ee;
+      --muted-text-color: #98a1b3;
+      --border-color: #323947;
+      --accent-color: #7ea1ff;
+      --accent-text-color: #0f1420;
+      --network-bits-background: #243458;
+      --pass-background: #1d3828;
+      --pass-text-color: #a9e4bd;
+      --warning-background: #3a3018;
+      --warning-text-color: #f1d48a;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page-background: #13161c;
+    --panel-background: #1c2028;
+    --text-color: #e5e8ee;
+    --muted-text-color: #98a1b3;
+    --border-color: #323947;
+    --accent-color: #7ea1ff;
+    --accent-text-color: #0f1420;
+    --network-bits-background: #243458;
+    --pass-background: #1d3828;
+    --pass-text-color: #a9e4bd;
+    --warning-background: #3a3018;
+    --warning-text-color: #f1d48a;
+    color-scheme: dark;
+  }
+
+  /* Sections and grids set their own display, which would otherwise beat the hidden attribute. */
+  [hidden] { display: none !important; }
+
+  body {
+    margin: 0;
+    background: var(--page-background);
+    color: var(--text-color);
+    font-family: var(--body-font);
+    font-size: 15px;
+  }
+  main {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 24px 16px 40px;
+    display: grid;
+    gap: 18px;
+  }
+  h1 { margin: 0; font-size: 24px; text-wrap: balance; }
+  h2 { margin: 0; font-size: 16px; }
+  .intro { margin: 6px 0 0; color: var(--muted-text-color); max-width: 65ch; }
+
+  section {
+    background: var(--panel-background);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 0;
+    display: grid;
+    gap: 12px;
+  }
+  .section-header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+
+  input[type="text"], select {
+    box-sizing: border-box;
+    padding: 7px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background: var(--page-background);
+    color: var(--text-color);
+    font: inherit;
+  }
+  input[type="text"] { width: 100%; }
+  input.mono-input { font-family: var(--mono-font); }
+  input.value-input { font-family: var(--mono-font); font-size: 20px; padding: 9px 11px; }
+  input.invalid { border-color: #d64545; }
+  input[type="range"] { width: 100%; margin: 0; accent-color: var(--accent-color); }
+  input:focus-visible, button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 1px; }
+
+  button {
+    padding: 8px 14px;
+    border: 1px solid var(--accent-color);
+    border-radius: 5px;
+    background: var(--accent-color);
+    color: var(--accent-text-color);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--accent-color); }
+  button.small-button { padding: 3px 9px; font-size: 13px; font-weight: 500; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .muted { color: var(--muted-text-color); font-variant-numeric: tabular-nums; }
+  .small { font-size: 13px; }
+  .field-label { display: grid; gap: 4px; min-width: 0; }
+  .warning-message { background: var(--warning-background); color: var(--warning-text-color); border-radius: 5px; padding: 8px 10px; margin: 0; }
+  .check-result { background: var(--pass-background); color: var(--pass-text-color); border-radius: 5px; padding: 8px 10px; margin: 0; font-weight: 600; }
+
+  .prefix-row { display: grid; grid-template-columns: minmax(0, 1fr) 60px; gap: 12px; align-items: center; }
+  .prefix-value { font-family: var(--mono-font); font-size: 16px; font-weight: 600; text-align: right; }
+
+  /* One row per value: name, value, copy button. */
+  .result-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border-color); border-radius: 5px; }
+  .result-list li {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 10px;
+  }
+  .result-list li + li { border-top: 1px solid var(--border-color); }
+  .result-name { color: var(--muted-text-color); font-size: 13px; }
+  .result-value { font-family: var(--mono-font); overflow-wrap: anywhere; }
+
+  /* Bits: network bits sit on a tinted background and in bold, host bits stay plain. */
+  .bit-rows { display: grid; gap: 8px; font-family: var(--mono-font); font-size: 14px; overflow-x: auto; }
+  .bit-row { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 10px; }
+  .bit-row-name { color: var(--muted-text-color); font-family: var(--body-font); font-size: 13px; }
+  .bit-groups { overflow-wrap: anywhere; }
+  .network-bits { background: var(--network-bits-background); font-weight: 700; border-radius: 2px; }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 5px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { font-size: 13px; color: var(--muted-text-color); font-weight: 600; white-space: nowrap; }
+  tbody td { border-top: 1px solid var(--border-color); font-family: var(--mono-font); font-size: 13px; white-space: nowrap; }
+  tbody tr.current-prefix td { background: var(--network-bits-background); font-weight: 700; }
+  summary { cursor: pointer; font-weight: 700; font-size: 16px; }
+  details > .table-wrap { margin-top: 12px; }
+
+  /* Phones: 16px inputs stop iOS from zooming in on focus; rows stack. */
+  @media (max-width: 640px) {
+    input[type="text"], select { font-size: 16px; }
+    input.value-input { font-size: 18px; }
+    .result-list li { grid-template-columns: minmax(0, 1fr) auto; }
+    .result-name { grid-column: 1 / -1; }
+    .bit-row { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    .section-header .actions span:empty { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>IP subnet calculator</h1>
+    <p class="intro">Type an IPv4 or IPv6 address with its prefix or mask to get the network, mask, address range and size. You can also split the network into smaller subnets and check whether an address belongs to it.</p>
+  </header>
+
+  <!-- The address and its prefix -->
+  <section aria-labelledby="addressHeading">
+    <h2 id="addressHeading">Address</h2>
+    <input type="text" class="value-input" id="addressInput" autocomplete="off" spellcheck="false" aria-label="IP address with prefix or mask" aria-describedby="addressHint">
+    <div class="prefix-row">
+      <input type="range" id="prefixSlider" min="0" max="32" aria-label="Prefix length">
+      <span class="prefix-value" id="prefixValue"></span>
+    </div>
+    <div class="muted small" id="addressHint">Takes 192.168.1.10/24, 192.168.1.10 255.255.255.0, a wildcard mask such as 192.168.1.10 0.0.0.255, or 2001:db8::1/64. An address with no prefix is read as a single host.</div>
+    <p class="warning-message" id="addressMessage" hidden></p>
+  </section>
+
+  <div id="resultSections" style="display:grid;gap:18px">
+    <!-- The network in every form -->
+    <section aria-labelledby="networkHeading">
+      <div class="section-header">
+        <h2 id="networkHeading">Network</h2>
+        <span class="muted" id="copyStatus" aria-live="polite"></span>
+      </div>
+      <ul class="result-list" id="resultList"></ul>
+    </section>
+
+    <!-- The same address in bits -->
+    <section aria-labelledby="bitsHeading">
+      <h2 id="bitsHeading">Bits</h2>
+      <div class="bit-rows" id="bitRows"></div>
+      <div class="muted small"><span class="network-bits" style="font-family:var(--mono-font)">Bold, tinted bits</span> are the network part. Plain bits are the host part.</div>
+    </section>
+
+    <!-- Is another address inside this network? -->
+    <section aria-labelledby="checkHeading">
+      <h2 id="checkHeading">Check an address</h2>
+      <input type="text" class="mono-input" id="checkInput" autocomplete="off" spellcheck="false" placeholder="192.168.1.77" aria-label="Address to check">
+      <p class="check-result" id="checkResult" aria-live="polite" hidden></p>
+      <p class="warning-message" id="checkMessage" aria-live="polite" hidden></p>
+    </section>
+
+    <!-- Smaller networks inside this one -->
+    <section aria-labelledby="splitHeading" id="splitSection">
+      <div class="section-header">
+        <h2 id="splitHeading">Split into subnets</h2>
+        <div class="actions">
+          <span class="muted" id="splitCopyStatus" aria-live="polite"></span>
+          <button type="button" class="secondary" id="copySubnetsButton">Copy as Markdown</button>
+          <button type="button" class="secondary" id="copyCidrsButton">Copy network list</button>
+        </div>
+      </div>
+      <label class="field-label">New prefix
+        <select id="splitSelect" style="width:fit-content;max-width:100%"></select>
+      </label>
+      <div class="table-wrap">
+        <table>
+          <thead id="splitTableHead"></thead>
+          <tbody id="splitTableBody"></tbody>
+        </table>
+      </div>
+      <div class="muted small" id="splitNote" hidden></div>
+    </section>
+
+    <!-- Every IPv4 prefix -->
+    <section id="referenceSection">
+      <details>
+        <summary>IPv4 prefix table</summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th scope="col">Prefix</th><th scope="col">Mask</th><th scope="col">Wildcard</th><th scope="col">Addresses</th><th scope="col">Usable hosts</th></tr></thead>
+            <tbody id="referenceTableBody"></tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+  </div>
+
+  <!-- Link that reopens the page with the address filled in -->
+  <section aria-labelledby="linkHeading">
+    <div class="section-header">
+      <h2 id="linkHeading">Link to this network</h2>
+      <div class="actions">
+        <span class="muted" id="linkCopyStatus" aria-live="polite"></span>
+        <button type="button" class="secondary" id="copyLinkButton">Copy link</button>
+      </div>
+    </div>
+    <input type="text" id="pageLinkOutput" readonly spellcheck="false" aria-label="Link to this page with the current network">
+  </section>
+</main>
+
+<script>
+  const EXAMPLE_ADDRESS_TEXT = '192.168.1.10/24';
+  const IPV4_BITS = 32;
+  const IPV6_BITS = 128;
+
+  // The longest list of subnets to draw. Larger splits show this many and say so.
+  const LARGEST_SUBNET_LIST = 256;
+  // How many prefix lengths past the current one the split list offers.
+  const SPLIT_CHOICE_COUNT = 16;
+
+  // Special ranges. The first match wins, so narrow ranges come before wide ones.
+  const IPV4_RANGE_TEXTS = [
+    ['255.255.255.255/32', 'Limited broadcast'],
+    ['0.0.0.0/8', '"This network" (RFC 791)'],
+    ['10.0.0.0/8', 'Private (RFC 1918)'],
+    ['100.64.0.0/10', 'Shared address space, carrier-grade NAT (RFC 6598)'],
+    ['127.0.0.0/8', 'Loopback'],
+    ['169.254.0.0/16', 'Link-local'],
+    ['172.16.0.0/12', 'Private (RFC 1918)'],
+    ['192.0.0.0/24', 'IETF protocol assignments'],
+    ['192.0.2.0/24', 'Documentation (TEST-NET-1)'],
+    ['192.168.0.0/16', 'Private (RFC 1918)'],
+    ['198.18.0.0/15', 'Benchmark testing'],
+    ['198.51.100.0/24', 'Documentation (TEST-NET-2)'],
+    ['203.0.113.0/24', 'Documentation (TEST-NET-3)'],
+    ['224.0.0.0/4', 'Multicast'],
+    ['240.0.0.0/4', 'Reserved'],
+    ['0.0.0.0/0', 'Public'],
+  ];
+  const IPV6_RANGE_TEXTS = [
+    ['::/128', 'Unspecified'],
+    ['::1/128', 'Loopback'],
+    ['::ffff:0:0/96', 'IPv4-mapped'],
+    ['64:ff9b::/96', 'NAT64'],
+    ['100::/64', 'Discard only'],
+    ['2001:db8::/32', 'Documentation'],
+    ['2002::/16', '6to4'],
+    ['fc00::/7', 'Unique local (private)'],
+    ['fe80::/10', 'Link-local'],
+    ['ff00::/8', 'Multicast'],
+    ['2000::/3', 'Global unicast (public)'],
+    ['::/0', 'Reserved'],
+  ];
+
+  // Page elements we read from or write to.
+  const addressInput = document.getElementById('addressInput');
+  const prefixSlider = document.getElementById('prefixSlider');
+  const prefixValue = document.getElementById('prefixValue');
+  const addressMessage = document.getElementById('addressMessage');
+  const resultSections = document.getElementById('resultSections');
+  const resultList = document.getElementById('resultList');
+  const copyStatus = document.getElementById('copyStatus');
+  const bitRows = document.getElementById('bitRows');
+  const checkInput = document.getElementById('checkInput');
+  const checkResult = document.getElementById('checkResult');
+  const checkMessage = document.getElementById('checkMessage');
+  const splitSection = document.getElementById('splitSection');
+  const splitSelect = document.getElementById('splitSelect');
+  const splitTableHead = document.getElementById('splitTableHead');
+  const splitTableBody = document.getElementById('splitTableBody');
+  const splitNote = document.getElementById('splitNote');
+  const splitCopyStatus = document.getElementById('splitCopyStatus');
+  const copySubnetsButton = document.getElementById('copySubnetsButton');
+  const copyCidrsButton = document.getElementById('copyCidrsButton');
+  const referenceSection = document.getElementById('referenceSection');
+  const referenceTableBody = document.getElementById('referenceTableBody');
+  const pageLinkOutput = document.getElementById('pageLinkOutput');
+  const copyLinkButton = document.getElementById('copyLinkButton');
+  const linkCopyStatus = document.getElementById('linkCopyStatus');
+
+  // The network last read from the address box, or null when it could not be read.
+  let currentNetwork = null;
+
+  // The split rows on screen, kept for the copy buttons.
+  let currentSubnetRows = [];
+
+  /* ---------- Reading addresses ---------- */
+
+  /** Read dotted IPv4 text into a BigInt. Throws an Error with a readable message. */
+  function parseIpv4(addressText) {
+    const octetTexts = addressText.split('.');
+    if (octetTexts.length !== 4) throw new Error(`"${addressText}" does not have four numbers separated by dots.`);
+    return octetTexts.reduce((addressValue, octetText) => {
+      if (!/^\d{1,3}$/.test(octetText) || Number(octetText) > 255) {
+        throw new Error(`"${octetText}" in ${addressText} is not a number from 0 to 255.`);
+      }
+      // Some tools read a leading zero as octal, so 010 could mean 8 or 10.
+      if (octetText.length > 1 && octetText.startsWith('0')) {
+        throw new Error(`"${octetText}" in ${addressText} has a leading zero, which different tools read differently. Write it without the zero.`);
+      }
+      return (addressValue << 8n) | BigInt(octetText);
+    }, 0n);
+  }
+
+  /** Read one side of an IPv6 address into 16-bit groups, including a dotted IPv4 ending. */
+  function readIpv6Groups(sideText, addressText) {
+    if (sideText === '') return [];
+    const groups = [];
+    sideText.split(':').forEach((groupText, groupIndex, allGroups) => {
+      if (groupText.includes('.')) {
+        if (groupIndex !== allGroups.length - 1) throw new Error(`In ${addressText}, a dotted IPv4 part can only come last.`);
+        const ipv4Value = parseIpv4(groupText);
+        groups.push(ipv4Value >> 16n, ipv4Value & 0xffffn);
+        return;
+      }
+      if (!/^[0-9a-f]{1,4}$/i.test(groupText)) throw new Error(`"${groupText}" in ${addressText} is not 1 to 4 hex digits.`);
+      groups.push(BigInt(`0x${groupText}`));
+    });
+    return groups;
+  }
+
+  /** Read IPv6 text into a BigInt. Throws an Error with a readable message. */
+  function parseIpv6(rawAddressText) {
+    // A zone such as %eth0 only means something on one machine.
+    const addressText = rawAddressText.replace(/%.*$/, '');
+    const sides = addressText.split('::');
+    if (sides.length > 2) throw new Error(`${addressText} has :: more than once. It can only appear once.`);
+
+    const leftGroups = readIpv6Groups(sides[0], addressText);
+    const rightGroups = sides.length === 2 ? readIpv6Groups(sides[1], addressText) : [];
+    const writtenCount = leftGroups.length + rightGroups.length;
+    if (sides.length === 1 && writtenCount !== 8) throw new Error(`${addressText} has ${writtenCount} groups. IPv6 needs 8, or :: to stand for the zeros.`);
+    if (sides.length === 2 && writtenCount > 7) throw new Error(`${addressText} has too many groups to use ::.`);
+
+    const zeroGroups = new Array(8 - writtenCount).fill(0n);
+    return [...leftGroups, ...zeroGroups, ...rightGroups].reduce((addressValue, groupValue) => (addressValue << 16n) | groupValue, 0n);
+  }
+
+  /** Read an address of either family. */
+  function parseAddress(addressText) {
+    if (addressText.includes(':')) return { bits: IPV6_BITS, value: parseIpv6(addressText) };
+    return { bits: IPV4_BITS, value: parseIpv4(addressText) };
+  }
+
+  /** A mask with this many leading ones. */
+  function prefixToMask(prefixLength, bits) {
+    const allOnes = (1n << BigInt(bits)) - 1n;
+    return allOnes ^ ((1n << BigInt(bits - prefixLength)) - 1n);
+  }
+
+  /** The prefix length of a mask, or null when its ones are not all on the left. */
+  function maskToPrefix(maskValue, bits) {
+    for (let prefixLength = 0; prefixLength <= bits; prefixLength++) {
+      if (prefixToMask(prefixLength, bits) === maskValue) return prefixLength;
+    }
+    return null;
+  }
+
+  /** Read a prefix length, a mask or a wildcard mask into a prefix length. Throws when it is none of them. */
+  function readPrefixText(prefixText, bits) {
+    if (/^\d+$/.test(prefixText)) {
+      if (Number(prefixText) > bits) throw new Error(`/${prefixText} is too long. The longest prefix here is /${bits}.`);
+      return Number(prefixText);
+    }
+    if (bits === IPV6_BITS) throw new Error(`"${prefixText}" is not a prefix length. IPv6 uses a number from 0 to 128.`);
+
+    const maskValue = parseIpv4(prefixText);
+    const prefixFromMask = maskToPrefix(maskValue, bits);
+    if (prefixFromMask !== null) return prefixFromMask;
+
+    const allOnes = (1n << BigInt(bits)) - 1n;
+    const prefixFromWildcard = maskToPrefix(allOnes ^ maskValue, bits);
+    if (prefixFromWildcard !== null) return prefixFromWildcard;
+    throw new Error(`${prefixText} is not a valid mask. All its 1 bits must come first, with no gaps.`);
+  }
+
+  /** Read the address box. Throws an Error with a readable message. */
+  function parseNetworkText(networkText) {
+    const pieces = networkText.trim().split(/\s*\/\s*|\s+/);
+    if (pieces.length > 2) throw new Error('Write one address and one prefix or mask, such as 192.168.1.10/24.');
+    const { bits, value } = parseAddress(pieces[0]);
+    const prefixLength = pieces.length === 2 ? readPrefixText(pieces[1], bits) : bits;
+    return buildNetwork(value, prefixLength, bits);
+  }
+
+  /** Everything worked out from an address and prefix. */
+  function buildNetwork(addressValue, prefixLength, bits) {
+    const maskValue = prefixToMask(prefixLength, bits);
+    const allOnes = (1n << BigInt(bits)) - 1n;
+    const networkValue = addressValue & maskValue;
+    return {
+      bits,
+      addressValue,
+      prefixLength,
+      maskValue,
+      wildcardValue: allOnes ^ maskValue,
+      networkValue,
+      lastValue: networkValue | (allOnes ^ maskValue),
+      totalAddresses: 1n << BigInt(bits - prefixLength),
+    };
+  }
+
+  /* ---------- Writing addresses ---------- */
+
+  function formatIpv4(addressValue) {
+    return [24n, 16n, 8n, 0n].map((shift) => String((addressValue >> shift) & 255n)).join('.');
+  }
+
+  /** The eight 16-bit groups of an IPv6 address as numbers. */
+  function ipv6Groups(addressValue) {
+    return Array.from({ length: 8 }, (unused, groupIndex) => Number((addressValue >> BigInt(112 - groupIndex * 16)) & 0xffffn));
+  }
+
+  /** The short form from RFC 5952: the first longest run of two or more zero groups becomes ::. */
+  function formatIpv6(addressValue) {
+    const groups = ipv6Groups(addressValue);
+    let bestStart = -1;
+    let bestLength = 0;
+    let runStart = -1;
+    groups.forEach((groupValue, groupIndex) => {
+      if (groupValue !== 0) { runStart = -1; return; }
+      if (runStart === -1) runStart = groupIndex;
+      const runLength = groupIndex - runStart + 1;
+      if (runLength > bestLength) { bestStart = runStart; bestLength = runLength; }
+    });
+    const groupTexts = groups.map((groupValue) => groupValue.toString(16));
+    if (bestLength < 2) return groupTexts.join(':');
+    return `${groupTexts.slice(0, bestStart).join(':')}::${groupTexts.slice(bestStart + bestLength).join(':')}`;
+  }
+
+  /** Every group written out in full. */
+  function formatIpv6Expanded(addressValue) {
+    return ipv6Groups(addressValue).map((groupValue) => groupValue.toString(16).padStart(4, '0')).join(':');
+  }
+
+  const formatAddress = (addressValue, bits) => (bits === IPV4_BITS ? formatIpv4(addressValue) : formatIpv6(addressValue));
+  const formatCount = (countValue) => countValue.toLocaleString('en-US');
+
+  /** The special range an address falls in. */
+  function describeAddressType(addressValue, bits) {
+    const rangeTexts = bits === IPV4_BITS ? IPV4_RANGE_TEXTS : IPV6_RANGE_TEXTS;
+    const matchingRange = rangeTexts.find(([rangeText]) => {
+      const range = parseNetworkText(rangeText);
+      return (addressValue & range.maskValue) === range.networkValue;
+    });
+    return matchingRange[1];
+  }
+
+  /** The old class of an IPv4 address, from its first bits. */
+  function ipv4ClassName(addressValue) {
+    const firstOctet = Number(addressValue >> 24n);
+    if (firstOctet < 128) return 'A';
+    if (firstOctet < 192) return 'B';
+    if (firstOctet < 224) return 'C';
+    return firstOctet < 240 ? 'D' : 'E';
+  }
+
+  /**
+   * The addresses hosts can use. A /31 is a point-to-point link where both
+   * addresses work (RFC 3021), and a /32 is one host. Longer networks lose the
+   * first and last address to the network and broadcast addresses.
+   */
+  function usableIpv4Range(network) {
+    if (network.prefixLength >= 31) {
+      return { firstUsable: network.networkValue, lastUsable: network.lastValue, usableCount: network.totalAddresses };
+    }
+    return { firstUsable: network.networkValue + 1n, lastUsable: network.lastValue - 1n, usableCount: network.totalAddresses - 2n };
+  }
+
+  /** Every value as [name, value] rows. */
+  function buildResultRows(network) {
+    const { bits, addressValue, prefixLength, networkValue, lastValue } = network;
+    const networkCidr = `${formatAddress(networkValue, bits)}/${prefixLength}`;
+
+    if (bits === IPV6_BITS) {
+      const resultRows = [
+        ['Network', networkCidr],
+        ['Address', formatIpv6(addressValue)],
+        ['Full address', formatIpv6Expanded(addressValue)],
+        ['First address', formatIpv6(networkValue)],
+        ['Last address', formatIpv6(lastValue)],
+        ['Addresses', formatCount(network.totalAddresses)],
+      ];
+      if (prefixLength <= 64) resultRows.push(['/64 networks', formatCount(1n << BigInt(64 - prefixLength))]);
+      resultRows.push(['Address type', describeAddressType(addressValue, bits)]);
+      return resultRows;
+    }
+
+    const { firstUsable, lastUsable, usableCount } = usableIpv4Range(network);
+    const resultRows = [
+      ['Network', networkCidr],
+      ['Address', formatIpv4(addressValue)],
+      ['Netmask', formatIpv4(network.maskValue)],
+      ['Wildcard mask', formatIpv4(network.wildcardValue)],
+    ];
+    if (prefixLength < 31) resultRows.push(['Broadcast', formatIpv4(lastValue)]);
+    resultRows.push(
+      ['First usable', formatIpv4(firstUsable)],
+      ['Last usable', formatIpv4(lastUsable)],
+      ['Addresses', formatCount(network.totalAddresses)],
+      ['Usable hosts', formatCount(usableCount)],
+      ['Address type', describeAddressType(addressValue, bits)],
+      ['Old class', ipv4ClassName(addressValue)],
+      ['Address as int', addressValue.toString()],
+      ['Address as hex', `0x${addressValue.toString(16).toUpperCase().padStart(8, '0')}`],
+    );
+    return resultRows;
+  }
+
+  /* ---------- Drawing ---------- */
+
+  /** Draw [name, value] rows, each with a copy button. */
+  function renderResultRows(resultRows) {
+    resultList.replaceChildren();
+    resultRows.forEach(([rowName, rowValue]) => {
+      const listItem = document.createElement('li');
+
+      const nameText = document.createElement('span');
+      nameText.className = 'result-name';
+      nameText.textContent = rowName;
+
+      const valueText = document.createElement('span');
+      valueText.className = 'result-value';
+      valueText.textContent = rowValue;
+
+      const copyButton = document.createElement('button');
+      copyButton.type = 'button';
+      copyButton.className = 'secondary small-button';
+      copyButton.textContent = 'Copy';
+      copyButton.dataset.copyValue = rowValue;
+      copyButton.setAttribute('aria-label', `Copy ${rowName}`);
+
+      listItem.append(nameText, valueText, copyButton);
+      resultList.appendChild(listItem);
+    });
+  }
+
+  /** One row of bits, grouped into octets or 16-bit groups, with the network part marked. */
+  function buildBitRow(rowName, rowValue, network) {
+    const groupSize = network.bits === IPV4_BITS ? 8 : 16;
+    const allBits = rowValue.toString(2).padStart(network.bits, '0');
+
+    const rowElement = document.createElement('div');
+    rowElement.className = 'bit-row';
+    const nameElement = document.createElement('span');
+    nameElement.className = 'bit-row-name';
+    nameElement.textContent = rowName;
+    const groupsElement = document.createElement('span');
+    groupsElement.className = 'bit-groups';
+
+    for (let groupStart = 0; groupStart < network.bits; groupStart += groupSize) {
+      const groupEnd = groupStart + groupSize;
+      const splitPoint = Math.min(groupEnd, Math.max(groupStart, network.prefixLength));
+      const networkPart = allBits.slice(groupStart, splitPoint);
+      const hostPart = allBits.slice(splitPoint, groupEnd);
+      if (networkPart) {
+        const networkElement = document.createElement('span');
+        networkElement.className = 'network-bits';
+        networkElement.textContent = networkPart;
+        groupsElement.appendChild(networkElement);
+      }
+      if (hostPart) groupsElement.appendChild(document.createTextNode(hostPart));
+      if (groupEnd < network.bits) groupsElement.appendChild(document.createTextNode(network.bits === IPV4_BITS ? '.' : ': '));
+    }
+
+    rowElement.append(nameElement, groupsElement);
+    return rowElement;
+  }
+
+  function renderBits(network) {
+    bitRows.replaceChildren(
+      buildBitRow('Address', network.addressValue, network),
+      buildBitRow('Mask', network.maskValue, network),
+      buildBitRow('Network', network.networkValue, network),
+    );
+  }
+
+  /** Fill the split list with the prefixes longer than the current one. */
+  function fillSplitSelect(network) {
+    const previousChoice = Number(splitSelect.value);
+    const longestChoice = Math.min(network.bits, network.prefixLength + SPLIT_CHOICE_COUNT);
+    splitSelect.replaceChildren();
+    for (let newPrefix = network.prefixLength + 1; newPrefix <= longestChoice; newPrefix++) {
+      const subnetOption = document.createElement('option');
+      const subnetCount = 1n << BigInt(newPrefix - network.prefixLength);
+      subnetOption.value = String(newPrefix);
+      subnetOption.textContent = `/${newPrefix}: ${formatCount(subnetCount)} subnets`;
+      splitSelect.appendChild(subnetOption);
+    }
+    // Keep the choice while the prefix moves, when it still fits.
+    if (previousChoice > network.prefixLength && previousChoice <= longestChoice) splitSelect.value = String(previousChoice);
+  }
+
+  /** Subnets of the current network as rows of text, first the column names. */
+  function buildSubnetRows(network, newPrefix) {
+    const hasUsableColumns = network.bits === IPV4_BITS;
+    const headerRow = hasUsableColumns
+      ? ['#', 'Network', 'First usable', 'Last usable', 'Broadcast', 'Usable hosts']
+      : ['#', 'Network', 'First address', 'Last address'];
+
+    const subnetSize = 1n << BigInt(network.bits - newPrefix);
+    const subnetCount = 1n << BigInt(newPrefix - network.prefixLength);
+    const listedCount = subnetCount > BigInt(LARGEST_SUBNET_LIST) ? LARGEST_SUBNET_LIST : Number(subnetCount);
+
+    const bodyRows = [];
+    for (let subnetIndex = 0; subnetIndex < listedCount; subnetIndex++) {
+      const subnetStart = network.networkValue + BigInt(subnetIndex) * subnetSize;
+      const subnet = buildNetwork(subnetStart, newPrefix, network.bits);
+      const cidrText = `${formatAddress(subnet.networkValue, network.bits)}/${newPrefix}`;
+      if (hasUsableColumns) {
+        const { firstUsable, lastUsable, usableCount } = usableIpv4Range(subnet);
+        bodyRows.push([
+          String(subnetIndex + 1),
+          cidrText,
+          formatIpv4(firstUsable),
+          formatIpv4(lastUsable),
+          newPrefix < 31 ? formatIpv4(subnet.lastValue) : '-',
+          formatCount(usableCount),
+        ]);
+      } else {
+        bodyRows.push([String(subnetIndex + 1), cidrText, formatIpv6(subnet.networkValue), formatIpv6(subnet.lastValue)]);
+      }
+    }
+    return { headerRow, bodyRows, subnetCount };
+  }
+
+  /** Draw the split table for the picked prefix. */
+  function renderSplit(network) {
+    splitCopyStatus.textContent = '';
+    splitSection.hidden = network.prefixLength >= network.bits;
+    if (splitSection.hidden) return;
+
+    fillSplitSelect(network);
+    const { headerRow, bodyRows, subnetCount } = buildSubnetRows(network, Number(splitSelect.value));
+    currentSubnetRows = [headerRow, ...bodyRows];
+
+    const headerElement = document.createElement('tr');
+    headerRow.forEach((columnName) => {
+      const headerCell = document.createElement('th');
+      headerCell.scope = 'col';
+      headerCell.textContent = columnName;
+      headerElement.appendChild(headerCell);
+    });
+    splitTableHead.replaceChildren(headerElement);
+
+    splitTableBody.replaceChildren(...bodyRows.map((bodyRow) => {
+      const rowElement = document.createElement('tr');
+      bodyRow.forEach((cellText) => {
+        const bodyCell = document.createElement('td');
+        bodyCell.textContent = cellText;
+        rowElement.appendChild(bodyCell);
+      });
+      return rowElement;
+    }));
+
+    const isCutShort = subnetCount > BigInt(bodyRows.length);
+    splitNote.hidden = !isCutShort;
+    splitNote.textContent = isCutShort
+      ? `Showing the first ${formatCount(bodyRows.length)} of ${formatCount(subnetCount)} subnets. The copy buttons copy the ones shown.`
+      : '';
+  }
+
+  /** Say whether the address in the check box is inside the network. */
+  function renderCheck(network) {
+    const checkText = checkInput.value.trim();
+    checkResult.hidden = true;
+    checkMessage.hidden = true;
+    checkInput.classList.remove('invalid');
+    if (checkText === '') return;
+
+    const showWarning = (warningText) => {
+      checkMessage.textContent = warningText;
+      checkMessage.hidden = false;
+    };
+
+    let checkedAddress;
+    try {
+      checkedAddress = parseAddress(checkText);
+    } catch (parseError) {
+      checkInput.classList.add('invalid');
+      showWarning(parseError.message);
+      return;
+    }
+
+    const networkText = `${formatAddress(network.networkValue, network.bits)}/${network.prefixLength}`;
+    if (checkedAddress.bits !== network.bits) {
+      showWarning(`No. ${checkText} and ${networkText} are different IP versions.`);
+      return;
+    }
+    const isInside = (checkedAddress.value & network.maskValue) === network.networkValue;
+    if (!isInside) {
+      showWarning(`No. ${checkText} is outside ${networkText}.`);
+      return;
+    }
+
+    let positionNote = '';
+    if (network.bits === IPV4_BITS && network.prefixLength < 31) {
+      if (checkedAddress.value === network.networkValue) positionNote = ' It is the network address, so a host cannot use it.';
+      if (checkedAddress.value === network.lastValue) positionNote = ' It is the broadcast address, so a host cannot use it.';
+    }
+    checkResult.textContent = `Yes. ${checkText} is inside ${networkText}.${positionNote}`;
+    checkResult.hidden = false;
+  }
+
+  /** Mark the current prefix in the reference table, which is drawn only once. */
+  function renderReferenceTable(network) {
+    referenceSection.hidden = network.bits !== IPV4_BITS;
+    [...referenceTableBody.children].forEach((tableRow, prefixLength) => {
+      tableRow.classList.toggle('current-prefix', prefixLength === network.prefixLength);
+    });
+  }
+
+  function fillReferenceTable() {
+    for (let prefixLength = 0; prefixLength <= IPV4_BITS; prefixLength++) {
+      const referenceNetwork = buildNetwork(0n, prefixLength, IPV4_BITS);
+      const rowElement = document.createElement('tr');
+      [
+        `/${prefixLength}`,
+        formatIpv4(referenceNetwork.maskValue),
+        formatIpv4(referenceNetwork.wildcardValue),
+        formatCount(referenceNetwork.totalAddresses),
+        formatCount(usableIpv4Range(referenceNetwork).usableCount),
+      ].forEach((cellText) => {
+        const tableCell = document.createElement('td');
+        tableCell.textContent = cellText;
+        rowElement.appendChild(tableCell);
+      });
+      referenceTableBody.appendChild(rowElement);
+    }
+  }
+
+  /** Re-read the address box and redraw. */
+  function refresh() {
+    copyStatus.textContent = '';
+    linkCopyStatus.textContent = '';
+
+    let messageText = '';
+    currentNetwork = null;
+    if (addressInput.value.trim() === '') {
+      messageText = 'Type an address above, such as 192.168.1.10/24.';
+    } else {
+      try {
+        currentNetwork = parseNetworkText(addressInput.value);
+      } catch (parseError) {
+        messageText = parseError.message;
+        addressInput.classList.add('invalid');
+      }
+    }
+    if (currentNetwork || addressInput.value.trim() === '') addressInput.classList.remove('invalid');
+
+    addressMessage.textContent = messageText;
+    addressMessage.hidden = !messageText;
+    resultSections.hidden = !currentNetwork;
+    pageLinkOutput.value = buildPageLink();
+    if (!currentNetwork) return;
+
+    prefixSlider.max = String(currentNetwork.bits);
+    prefixSlider.value = String(currentNetwork.prefixLength);
+    prefixValue.textContent = `/${currentNetwork.prefixLength}`;
+    renderResultRows(buildResultRows(currentNetwork));
+    renderBits(currentNetwork);
+    renderCheck(currentNetwork);
+    renderSplit(currentNetwork);
+    renderReferenceTable(currentNetwork);
+    pageLinkOutput.value = buildPageLink();
+  }
+
+  /* ---------- Clipboard ---------- */
+
+  /** Put text on the clipboard, with the older copy command as a fallback. */
+  async function writeToClipboard(plainText) {
+    try {
+      await navigator.clipboard.writeText(plainText);
+      return true;
+    } catch (clipboardError) {
+      const fillClipboard = (copyEvent) => {
+        copyEvent.clipboardData.setData('text/plain', plainText);
+        copyEvent.preventDefault();
+      };
+      document.addEventListener('copy', fillClipboard, { once: true });
+      const copySucceeded = document.execCommand('copy');
+      document.removeEventListener('copy', fillClipboard);
+      return copySucceeded;
+    }
+  }
+
+  /** Text rows as a Markdown table. */
+  function rowsToMarkdown(tableRows) {
+    const [headerCells, ...bodyRows] = tableRows;
+    const toMarkdownLine = (rowCells) => `| ${rowCells.join(' | ')} |`;
+    return [toMarkdownLine(headerCells), `| ${headerCells.map(() => '---').join(' | ')} |`, ...bodyRows.map(toMarkdownLine)].join('\n');
+  }
+
+  /* ---------- Link with the network filled in ---------- */
+
+  /** Encode only what would break the query string. Spaces, / and : stay readable. */
+  function encodeQueryPart(rawText) {
+    return rawText
+      .replace(/%/g, '%25').replace(/&/g, '%26').replace(/=/g, '%3D')
+      .replace(/#/g, '%23').replace(/\+/g, '%2B');
+  }
+
+  function buildPageLink() {
+    const pageAddress = window.location.href.split(/[?#]/)[0];
+    const queryParts = [];
+    if (addressInput.value.trim()) queryParts.push(`ip=${encodeQueryPart(addressInput.value.trim())}`);
+    if (currentNetwork && splitSelect.value && !splitSection.hidden) queryParts.push(`split=${splitSelect.value}`);
+    return queryParts.length ? `${pageAddress}?${queryParts.join('&')}` : pageAddress;
+  }
+
+  /** Read one ?name=... from the address. Plain spaces, + and %20 all mean a space. */
+  function readQueryParameter(parameterName) {
+    const parameterMatch = window.location.search.match(new RegExp(`[?&]${parameterName}=([^&]*)`));
+    if (!parameterMatch) return null;
+    const withSpaces = parameterMatch[1].replace(/\+/g, ' ');
+    try { return decodeURIComponent(withSpaces); } catch (decodeError) { return withSpaces; }
+  }
+
+  /* ---------- Events ---------- */
+
+  addressInput.addEventListener('input', refresh);
+  checkInput.addEventListener('input', () => { if (currentNetwork) renderCheck(currentNetwork); });
+
+  // The slider keeps the address that was typed and only changes its prefix.
+  prefixSlider.addEventListener('input', () => {
+    if (!currentNetwork) return;
+    addressInput.value = `${formatAddress(currentNetwork.addressValue, currentNetwork.bits)}/${prefixSlider.value}`;
+    refresh();
+  });
+
+  splitSelect.addEventListener('change', () => {
+    renderSplit(currentNetwork);
+    pageLinkOutput.value = buildPageLink();
+  });
+
+  // One listener on the list covers every copy button in it.
+  resultList.addEventListener('click', async (clickEvent) => {
+    const copyValue = clickEvent.target.dataset.copyValue;
+    if (copyValue === undefined) return;
+    const copySucceeded = await writeToClipboard(copyValue);
+    copyStatus.textContent = copySucceeded ? `Copied ${copyValue}` : 'Your browser blocked the clipboard.';
+  });
+
+  copySubnetsButton.addEventListener('click', async () => {
+    const copySucceeded = await writeToClipboard(rowsToMarkdown(currentSubnetRows));
+    splitCopyStatus.textContent = copySucceeded ? 'Copied' : 'Your browser blocked the clipboard.';
+  });
+
+  copyCidrsButton.addEventListener('click', async () => {
+    const networkTexts = currentSubnetRows.slice(1).map((subnetRow) => subnetRow[1]);
+    const copySucceeded = await writeToClipboard(networkTexts.join('\n'));
+    splitCopyStatus.textContent = copySucceeded ? 'Copied' : 'Your browser blocked the clipboard.';
+  });
+
+  copyLinkButton.addEventListener('click', async () => {
+    const copySucceeded = await writeToClipboard(pageLinkOutput.value);
+    if (!copySucceeded) pageLinkOutput.select();
+    linkCopyStatus.textContent = copySucceeded ? 'Copied' : 'Selected. Press Ctrl+C to copy.';
+  });
+
+  /* ---------- Start ---------- */
+
+  fillReferenceTable();
+  addressInput.value = readQueryParameter('ip') ?? EXAMPLE_ADDRESS_TEXT;
+  refresh();
+  const splitFromAddress = readQueryParameter('split');
+  if (splitFromAddress && [...splitSelect.options].some((splitOption) => splitOption.value === splitFromAddress)) {
+    splitSelect.value = splitFromAddress;
+    renderSplit(currentNetwork);
+    pageLinkOutput.value = buildPageLink();
+  }
+</script>
+</body>
+</html>
