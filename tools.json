@@ -4,5 +4,9 @@
   { "file": "flag-decoder.html", "title": "Flag Decoder" },
   { "file": "table-converter.html", "title": "Table Converter" },
   { "file": "pairwise.html", "title": "Pairwise Test Cases" },
-  { "file": "decision-table.html", "title": "Decision Table" }
+  { "file": "decision-table.html", "title": "Decision Table" },
+  { "file": "timestamp-converter.html", "title": "Timestamp Converter" },
+  { "file": "uuid-generator.html", "title": "UUID Generator" },
+  { "file": "cron-explainer.html", "title": "Cron Explainer" },
+  { "file": "qr-code.html", "title": "QR Code Generator" }
 ]

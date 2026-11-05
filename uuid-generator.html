@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UUID generator</title>
+<style>
+  /* Same colour scheme and layout as flag-decoder.html. */
+  :root {
+    --page-background: #f3f5f8;
+    --panel-background: #ffffff;
+    --text-color: #1b2230;
+    --muted-text-color: #5b6477;
+    --border-color: #d6dbe4;
+    --accent-color: #2457d6;
+    --accent-text-color: #ffffff;
+    --warning-background: #fff3d6;
+    --warning-text-color: #6b4a00;
+    --body-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono-font: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page-background: #13161c;
+      --panel-background: #1c2028;
+      --text-color: #e5e8ee;
+      --muted-text-color: #98a1b3;
+      --border-color: #323947;
+      --accent-color: #7ea1ff;
+      --accent-text-color: #0f1420;
+      --warning-background: #3a3018;
+      --warning-text-color: #f1d48a;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page-background: #13161c;
+    --panel-background: #1c2028;
+    --text-color: #e5e8ee;
+    --muted-text-color: #98a1b3;
+    --border-color: #323947;
+    --accent-color: #7ea1ff;
+    --accent-text-color: #0f1420;
+    --warning-background: #3a3018;
+    --warning-text-color: #f1d48a;
+    color-scheme: dark;
+  }
+
+  /* Sections and grids set their own display, which would otherwise beat the hidden attribute. */
+  [hidden] { display: none !important; }
+
+  body {
+    margin: 0;
+    background: var(--page-background);
+    color: var(--text-color);
+    font-family: var(--body-font);
+    font-size: 15px;
+  }
+  main {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 24px 16px 40px;
+    display: grid;
+    gap: 18px;
+  }
+  h1 { margin: 0; font-size: 24px; text-wrap: balance; }
+  h2 { margin: 0; font-size: 16px; }
+  .intro { margin: 6px 0 0; color: var(--muted-text-color); max-width: 65ch; }
+
+  section {
+    background: var(--panel-background);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 0;
+    display: grid;
+    gap: 12px;
+  }
+  .section-header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+
+  input[type="text"], input[type="number"], textarea {
+    box-sizing: border-box;
+    padding: 7px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background: var(--page-background);
+    color: var(--text-color);
+    font: inherit;
+  }
+  input[type="text"], textarea { width: 100%; }
+  input[type="number"] { width: 7em; }
+  textarea {
+    min-height: 240px;
+    font-family: var(--mono-font);
+    font-size: 13px;
+    white-space: pre;
+    overflow-x: auto;
+    resize: vertical;
+  }
+  input.mono-input { font-family: var(--mono-font); }
+  input:focus-visible, button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 1px; }
+
+  button {
+    padding: 8px 14px;
+    border: 1px solid var(--accent-color);
+    border-radius: 5px;
+    background: var(--accent-color);
+    color: var(--accent-text-color);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--accent-color); }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .muted { color: var(--muted-text-color); font-variant-numeric: tabular-nums; }
+  .small { font-size: 13px; }
+  .options { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: end; }
+  .option-group { display: grid; gap: 4px; }
+  .option-name { font-size: 13px; color: var(--muted-text-color); }
+
+  /* Choices drawn as a row of segmented buttons. */
+  .format-choice { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--border-color); border-radius: 5px; overflow: hidden; width: fit-content; }
+  .format-choice label { padding: 7px 14px; cursor: pointer; border-right: 1px solid var(--border-color); }
+  .format-choice label:last-child { border-right: none; }
+  .format-choice input { position: absolute; opacity: 0; pointer-events: none; }
+  .format-choice label:has(input:checked) { background: var(--accent-color); color: var(--accent-text-color); font-weight: 600; }
+  .format-choice label:has(input:focus-visible) { outline: 2px solid var(--accent-color); outline-offset: -2px; }
+
+  .warning-message { background: var(--warning-background); color: var(--warning-text-color); border-radius: 5px; padding: 8px 10px; margin: 0; }
+
+  /* The decoded parts, side by side; wraps on narrow screens. */
+  .value-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; margin: 0; }
+  .value-summary div { border: 1px solid var(--border-color); border-radius: 5px; padding: 8px 10px; min-width: 0; }
+  .value-summary dt { font-size: 12px; color: var(--muted-text-color); }
+  .value-summary dd { margin: 2px 0 0; font-family: var(--mono-font); font-size: 14px; overflow-wrap: anywhere; }
+
+  /* Phones: 16px inputs stop iOS from zooming in on focus; buttons fill the width. */
+  @media (max-width: 640px) {
+    input[type="text"], input[type="number"], textarea { font-size: 16px; }
+    .section-header .actions { width: 100%; }
+    .section-header .actions button { flex: 1 1 auto; }
+    .section-header .actions span:empty { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>UUID generator</h1>
+    <p class="intro">Generates random UUIDs in your browser. Version 4 is fully random. Version 7 starts with the current time, so new values sort after older ones. Paste a UUID further down to see what is inside it.</p>
+  </header>
+
+  <!-- What to generate and how to write it -->
+  <section aria-labelledby="optionsHeading">
+    <h2 id="optionsHeading">Options</h2>
+    <div class="options">
+      <div class="option-group">
+        <span class="option-name">Version</span>
+        <div class="format-choice" role="radiogroup" aria-label="UUID version">
+          <label><input type="radio" name="uuidVersion" value="4" checked> v4</label>
+          <label><input type="radio" name="uuidVersion" value="7"> v7</label>
+        </div>
+      </div>
+      <label class="option-group">
+        <span class="option-name">How many</span>
+        <input type="number" id="countInput" min="1" max="10000" value="10">
+      </label>
+      <div class="option-group">
+        <span class="option-name">Wrap each in</span>
+        <div class="format-choice" role="radiogroup" aria-label="Wrap each UUID in">
+          <label><input type="radio" name="wrapStyle" value="none" checked> None</label>
+          <label><input type="radio" name="wrapStyle" value="braces"> {…}</label>
+          <label><input type="radio" name="wrapStyle" value="double"> "…"</label>
+          <label><input type="radio" name="wrapStyle" value="single"> '…'</label>
+        </div>
+      </div>
+    </div>
+    <div class="actions">
+      <label><input type="checkbox" id="uppercaseCheckbox"> Uppercase</label>
+      <label><input type="checkbox" id="noHyphensCheckbox"> No hyphens</label>
+      <label><input type="checkbox" id="commaCheckbox"> Comma between</label>
+    </div>
+    <div class="muted small">Single quotes with a comma between gives a list for a SQL <code>IN (...)</code>. SQL Server sorts <code>uniqueidentifier</code> by its last bytes first, so v7 values do not keep their time order there.</div>
+  </section>
+
+  <!-- The generated values -->
+  <section aria-labelledby="outputHeading">
+    <div class="section-header">
+      <h2 id="outputHeading">UUIDs</h2>
+      <div class="actions">
+        <span class="muted" id="copyStatus" aria-live="polite"></span>
+        <button type="button" class="secondary" id="generateButton">Generate new</button>
+        <button type="button" id="copyButton">Copy all</button>
+      </div>
+    </div>
+    <textarea id="uuidOutput" readonly spellcheck="false" aria-label="Generated UUIDs"></textarea>
+  </section>
+
+  <!-- Look inside an existing UUID -->
+  <section aria-labelledby="decodeHeading">
+    <h2 id="decodeHeading">Decode a UUID</h2>
+    <input type="text" class="mono-input" id="decodeInput" autocomplete="off" spellcheck="false" aria-label="UUID to decode">
+    <p class="warning-message" id="decodeMessage" hidden></p>
+    <dl class="value-summary" id="decodeSummary"></dl>
+  </section>
+
+  <!-- Link that reopens the page with the same options -->
+  <section aria-labelledby="linkHeading">
+    <div class="section-header">
+      <h2 id="linkHeading">Link to these options</h2>
+      <div class="actions">
+        <span class="muted" id="linkCopyStatus" aria-live="polite"></span>
+        <button type="button" class="secondary" id="copyLinkButton">Copy link</button>
+      </div>
+    </div>
+    <input type="text" id="pageLinkOutput" readonly spellcheck="false" aria-label="Link to this page with the current options">
+  </section>
+</main>
+
+<script>
+  const SMALLEST_COUNT = 1;
+  const LARGEST_COUNT = 10000;
+
+  // Version 1 and 6 count 100-nanosecond steps since 1582-10-15; this many came before 1970.
+  const GREGORIAN_TICKS_BEFORE_1970 = 122192928000000000n;
+  const GREGORIAN_TICKS_PER_MILLISECOND = 10000n;
+
+  // Version 7 has 12 bits after the time. They hold a counter inside one millisecond.
+  const VERSION_7_COUNTER_LIMIT = 0x1000;
+
+  // Page elements we read from or write to.
+  const versionRadios = document.querySelectorAll('input[name="uuidVersion"]');
+  const wrapRadios = document.querySelectorAll('input[name="wrapStyle"]');
+  const countInput = document.getElementById('countInput');
+  const uppercaseCheckbox = document.getElementById('uppercaseCheckbox');
+  const noHyphensCheckbox = document.getElementById('noHyphensCheckbox');
+  const commaCheckbox = document.getElementById('commaCheckbox');
+  const uuidOutput = document.getElementById('uuidOutput');
+  const generateButton = document.getElementById('generateButton');
+  const copyButton = document.getElementById('copyButton');
+  const copyStatus = document.getElementById('copyStatus');
+  const decodeInput = document.getElementById('decodeInput');
+  const decodeMessage = document.getElementById('decodeMessage');
+  const decodeSummary = document.getElementById('decodeSummary');
+  const pageLinkOutput = document.getElementById('pageLinkOutput');
+  const copyLinkButton = document.getElementById('copyLinkButton');
+  const linkCopyStatus = document.getElementById('linkCopyStatus');
+
+  // The generated values as 32 lowercase hex digits, before formatting.
+  let currentUuidDigits = [];
+
+  // Last time and counter used for version 7, so values always increase.
+  let lastVersion7Millisecond = 0;
+  let lastVersion7Counter = 0;
+
+  /* ---------- Generating ---------- */
+
+  /** Secure random bytes. getRandomValues also works on plain http, unlike randomUUID. */
+  function randomBytes(byteCount) {
+    return crypto.getRandomValues(new Uint8Array(byteCount));
+  }
+
+  /** Bytes as lowercase hex digits. */
+  function bytesToHex(byteValues) {
+    return [...byteValues].map((byteValue) => byteValue.toString(16).padStart(2, '0')).join('');
+  }
+
+  /** Version 4: 122 random bits, plus the version and variant markers. */
+  function generateVersion4() {
+    const uuidBytes = randomBytes(16);
+    uuidBytes[6] = (uuidBytes[6] & 0x0f) | 0x40;
+    uuidBytes[8] = (uuidBytes[8] & 0x3f) | 0x80;
+    return bytesToHex(uuidBytes);
+  }
+
+  /** A new random start for the version 7 counter. The top bit stays 0 to leave room to count up. */
+  function randomCounterStart() {
+    const counterBytes = randomBytes(2);
+    return ((counterBytes[0] << 8) | counterBytes[1]) & 0x7ff;
+  }
+
+  /**
+   * Version 7: 48 bits of Unix milliseconds, a 12-bit counter, then random bits.
+   * Inside one millisecond the counter goes up, so a batch stays in order. When
+   * it runs out, the time moves on by one millisecond (RFC 9562, section 6.2).
+   */
+  function generateVersion7() {
+    const clockMillisecond = Date.now();
+    if (clockMillisecond > lastVersion7Millisecond) {
+      lastVersion7Millisecond = clockMillisecond;
+      lastVersion7Counter = randomCounterStart();
+    } else {
+      lastVersion7Counter += 1;
+      if (lastVersion7Counter >= VERSION_7_COUNTER_LIMIT) {
+        lastVersion7Millisecond += 1;
+        lastVersion7Counter = randomCounterStart();
+      }
+    }
+
+    const timeDigits = lastVersion7Millisecond.toString(16).padStart(12, '0');
+    const counterDigits = lastVersion7Counter.toString(16).padStart(3, '0');
+    const tailBytes = randomBytes(8);
+    tailBytes[0] = (tailBytes[0] & 0x3f) | 0x80;
+    return `${timeDigits}7${counterDigits}${bytesToHex(tailBytes)}`;
+  }
+
+  /** How many to generate, kept inside the allowed range. */
+  function readCount() {
+    const typedCount = Math.floor(Number(countInput.value));
+    if (!Number.isFinite(typedCount)) return SMALLEST_COUNT;
+    return Math.min(LARGEST_COUNT, Math.max(SMALLEST_COUNT, typedCount));
+  }
+
+  function selectedRadioValue(radioList) {
+    return [...radioList].find((radioButton) => radioButton.checked).value;
+  }
+
+  /** Make a new batch, then draw it. */
+  function generateBatch() {
+    const generateOne = selectedRadioValue(versionRadios) === '7' ? generateVersion7 : generateVersion4;
+    currentUuidDigits = Array.from({ length: readCount() }, generateOne);
+    renderOutput();
+  }
+
+  /* ---------- Writing ---------- */
+
+  /** 32 hex digits as 8-4-4-4-12. */
+  function addHyphens(hexDigits) {
+    return [hexDigits.slice(0, 8), hexDigits.slice(8, 12), hexDigits.slice(12, 16), hexDigits.slice(16, 20), hexDigits.slice(20)].join('-');
+  }
+
+  /** One UUID in the picked format. */
+  function formatUuid(hexDigits) {
+    let uuidText = noHyphensCheckbox.checked ? hexDigits : addHyphens(hexDigits);
+    if (uppercaseCheckbox.checked) uuidText = uuidText.toUpperCase();
+    const wrapCharacters = { none: ['', ''], braces: ['{', '}'], double: ['"', '"'], single: ["'", "'"] };
+    const [wrapStart, wrapEnd] = wrapCharacters[selectedRadioValue(wrapRadios)];
+    return wrapStart + uuidText + wrapEnd;
+  }
+
+  /** Redraw the list without making new values, so format changes keep the same UUIDs. */
+  function renderOutput() {
+    uuidOutput.value = currentUuidDigits.map(formatUuid).join(commaCheckbox.checked ? ',\n' : '\n');
+    const uuidCount = currentUuidDigits.length;
+    copyStatus.textContent = `${uuidCount} ${uuidCount === 1 ? 'UUID' : 'UUIDs'}`;
+    pageLinkOutput.value = buildPageLink();
+    linkCopyStatus.textContent = '';
+  }
+
+  /* ---------- Decoding ---------- */
+
+  /** What the variant digit means. */
+  function describeVariant(variantDigit) {
+    const variantValue = parseInt(variantDigit, 16);
+    if (variantValue <= 7) return 'NCS (old, reserved)';
+    if (variantValue <= 11) return 'RFC 9562';
+    if (variantValue <= 13) return 'Microsoft (old, reserved)';
+    return 'Reserved';
+  }
+
+  /** The moment stored in a version 1, 6 or 7 UUID, or null for the other versions. */
+  function embeddedMilliseconds(hexDigits, versionNumber) {
+    if (versionNumber === 7) return parseInt(hexDigits.slice(0, 12), 16);
+
+    let tickDigits = null;
+    if (versionNumber === 1) tickDigits = hexDigits.slice(13, 16) + hexDigits.slice(8, 12) + hexDigits.slice(0, 8);
+    if (versionNumber === 6) tickDigits = hexDigits.slice(0, 12) + hexDigits.slice(13, 16);
+    if (tickDigits === null) return null;
+
+    const tickCount = BigInt('0x' + tickDigits);
+    return Number((tickCount - GREGORIAN_TICKS_BEFORE_1970) / GREGORIAN_TICKS_PER_MILLISECOND);
+  }
+
+  /** Turn a pasted UUID into [name, value] rows. Throws an Error with a readable message. */
+  function decodeUuid(uuidText) {
+    const hexDigits = uuidText.trim()
+      .replace(/^urn:uuid:/i, '')
+      .replace(/^[{"']+|[}"',]+$/g, '')
+      .replace(/-/g, '')
+      .toLowerCase();
+    if (!/^[0-9a-f]{32}$/.test(hexDigits)) {
+      throw new Error('A UUID has 32 hex digits (0-9 and A-F), with or without hyphens.');
+    }
+
+    if (/^0+$/.test(hexDigits)) return [['Standard form', addHyphens(hexDigits)], ['Type', 'Nil UUID (all zeros)']];
+    if (/^f+$/.test(hexDigits)) return [['Standard form', addHyphens(hexDigits)], ['Type', 'Max UUID (all ones)']];
+
+    const versionNumber = parseInt(hexDigits[12], 16);
+    const versionNames = {
+      1: 'time and MAC address',
+      2: 'DCE security',
+      3: 'MD5 of a name',
+      4: 'random',
+      5: 'SHA-1 of a name',
+      6: 'time, sortable',
+      7: 'Unix time, sortable',
+      8: 'custom',
+    };
+    const variantText = describeVariant(hexDigits[16]);
+
+    const decodedRows = [
+      ['Standard form', addHyphens(hexDigits)],
+      ['Version', `${versionNumber}${versionNames[versionNumber] ? ` (${versionNames[versionNumber]})` : ' (unknown)'}`],
+      ['Variant', variantText],
+    ];
+
+    // The version digit only means something for the RFC variant.
+    const storedMilliseconds = variantText === 'RFC 9562' ? embeddedMilliseconds(hexDigits, versionNumber) : null;
+    if (storedMilliseconds !== null && !Number.isNaN(new Date(storedMilliseconds).getTime())) {
+      decodedRows.push(['Time, UTC', new Date(storedMilliseconds).toISOString()]);
+      decodedRows.push(['Unix milliseconds', String(storedMilliseconds)]);
+    }
+    return decodedRows;
+  }
+
+  /** Re-read the decode box and redraw. */
+  function renderDecoded() {
+    decodeSummary.replaceChildren();
+    let messageText = '';
+    if (decodeInput.value.trim() !== '') {
+      try {
+        decodeUuid(decodeInput.value).forEach(([rowName, rowValue]) => {
+          const rowBox = document.createElement('div');
+          const nameElement = document.createElement('dt');
+          nameElement.textContent = rowName;
+          const valueElement = document.createElement('dd');
+          valueElement.textContent = rowValue;
+          rowBox.append(nameElement, valueElement);
+          decodeSummary.appendChild(rowBox);
+        });
+      } catch (decodeError) {
+        messageText = decodeError.message;
+      }
+    }
+    decodeMessage.textContent = messageText;
+    decodeMessage.hidden = !messageText;
+  }
+
+  /* ---------- Clipboard ---------- */
+
+  /** Put text on the clipboard, with the older copy command as a fallback. */
+  async function writeToClipboard(plainText) {
+    try {
+      await navigator.clipboard.writeText(plainText);
+      return true;
+    } catch (clipboardError) {
+      const fillClipboard = (copyEvent) => {
+        copyEvent.clipboardData.setData('text/plain', plainText);
+        copyEvent.preventDefault();
+      };
+      document.addEventListener('copy', fillClipboard, { once: true });
+      const copySucceeded = document.execCommand('copy');
+      document.removeEventListener('copy', fillClipboard);
+      return copySucceeded;
+    }
+  }
+
+  /* ---------- Link with the options filled in ---------- */
+
+  /** This page's address with every option that differs from the defaults. */
+  function buildPageLink() {
+    const pageAddress = window.location.href.split(/[?#]/)[0];
+    const queryParts = [];
+    if (selectedRadioValue(versionRadios) !== '4') queryParts.push(`version=${selectedRadioValue(versionRadios)}`);
+    if (readCount() !== 10) queryParts.push(`count=${readCount()}`);
+    if (selectedRadioValue(wrapRadios) !== 'none') queryParts.push(`wrap=${selectedRadioValue(wrapRadios)}`);
+    if (uppercaseCheckbox.checked) queryParts.push('uppercase=1');
+    if (noHyphensCheckbox.checked) queryParts.push('nohyphens=1');
+    if (commaCheckbox.checked) queryParts.push('comma=1');
+    return queryParts.length ? `${pageAddress}?${queryParts.join('&')}` : pageAddress;
+  }
+
+  /** Read one ?name=... from the address. */
+  function readQueryParameter(parameterName) {
+    return new URLSearchParams(window.location.search).get(parameterName);
+  }
+
+  /** Tick the radio button with this value, when there is one. */
+  function selectRadio(radioList, radioValue) {
+    const matchingRadio = [...radioList].find((radioButton) => radioButton.value === radioValue);
+    if (matchingRadio) matchingRadio.checked = true;
+  }
+
+  /* ---------- Events ---------- */
+
+  // Version and count need new values; format options only redraw.
+  versionRadios.forEach((versionRadio) => versionRadio.addEventListener('change', generateBatch));
+  countInput.addEventListener('input', generateBatch);
+  generateButton.addEventListener('click', generateBatch);
+  wrapRadios.forEach((wrapRadio) => wrapRadio.addEventListener('change', renderOutput));
+  [uppercaseCheckbox, noHyphensCheckbox, commaCheckbox].forEach((optionCheckbox) => optionCheckbox.addEventListener('change', renderOutput));
+
+  // Show the count that was actually used when the box was left out of range.
+  countInput.addEventListener('change', () => { countInput.value = String(readCount()); });
+
+  decodeInput.addEventListener('input', renderDecoded);
+
+  copyButton.addEventListener('click', async () => {
+    const copySucceeded = await writeToClipboard(uuidOutput.value);
+    if (!copySucceeded) uuidOutput.select();
+    copyStatus.textContent = copySucceeded ? 'Copied' : 'Selected. Press Ctrl+C to copy.';
+  });
+
+  copyLinkButton.addEventListener('click', async () => {
+    const copySucceeded = await writeToClipboard(pageLinkOutput.value);
+    if (!copySucceeded) pageLinkOutput.select();
+    linkCopyStatus.textContent = copySucceeded ? 'Copied' : 'Selected. Press Ctrl+C to copy.';
+  });
+
+  /* ---------- Start ---------- */
+
+  selectRadio(versionRadios, readQueryParameter('version'));
+  selectRadio(wrapRadios, readQueryParameter('wrap'));
+  if (readQueryParameter('count') !== null) countInput.value = readQueryParameter('count');
+  countInput.value = String(readCount());
+  uppercaseCheckbox.checked = readQueryParameter('uppercase') === '1';
+  noHyphensCheckbox.checked = readQueryParameter('nohyphens') === '1';
+  commaCheckbox.checked = readQueryParameter('comma') === '1';
+
+  generateBatch();
+  decodeInput.value = addHyphens(currentUuidDigits[0]);
+  renderDecoded();
+</script>
+</body>
+</html>

@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timestamp converter</title>
+<style>
+  /* Same colour scheme and layout as flag-decoder.html. */
+  :root {
+    --page-background: #f3f5f8;
+    --panel-background: #ffffff;
+    --text-color: #1b2230;
+    --muted-text-color: #5b6477;
+    --border-color: #d6dbe4;
+    --accent-color: #2457d6;
+    --accent-text-color: #ffffff;
+    --warning-background: #fff3d6;
+    --warning-text-color: #6b4a00;
+    --body-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono-font: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page-background: #13161c;
+      --panel-background: #1c2028;
+      --text-color: #e5e8ee;
+      --muted-text-color: #98a1b3;
+      --border-color: #323947;
+      --accent-color: #7ea1ff;
+      --accent-text-color: #0f1420;
+      --warning-background: #3a3018;
+      --warning-text-color: #f1d48a;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page-background: #13161c;
+    --panel-background: #1c2028;
+    --text-color: #e5e8ee;
+    --muted-text-color: #98a1b3;
+    --border-color: #323947;
+    --accent-color: #7ea1ff;
+    --accent-text-color: #0f1420;
+    --warning-background: #3a3018;
+    --warning-text-color: #f1d48a;
+    color-scheme: dark;
+  }
+
+  /* Sections and grids set their own display, which would otherwise beat the hidden attribute. */
+  [hidden] { display: none !important; }
+
+  body {
+    margin: 0;
+    background: var(--page-background);
+    color: var(--text-color);
+    font-family: var(--body-font);
+    font-size: 15px;
+  }
+  main {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 24px 16px 40px;
+    display: grid;
+    gap: 18px;
+  }
+  h1 { margin: 0; font-size: 24px; text-wrap: balance; }
+  h2 { margin: 0; font-size: 16px; }
+  .intro { margin: 6px 0 0; color: var(--muted-text-color); max-width: 65ch; }
+
+  section {
+    background: var(--panel-background);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 0;
+    display: grid;
+    gap: 12px;
+  }
+  .section-header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+
+  input[type="text"], select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background: var(--page-background);
+    color: var(--text-color);
+    font: inherit;
+  }
+  input.value-input { font-family: var(--mono-font); font-size: 20px; padding: 9px 11px; }
+  input.value-input.invalid { border-color: #d64545; }
+  input:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 1px; }
+
+  button {
+    padding: 8px 14px;
+    border: 1px solid var(--accent-color);
+    border-radius: 5px;
+    background: var(--accent-color);
+    color: var(--accent-text-color);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--accent-color); }
+  button.small-button { padding: 3px 9px; font-size: 13px; font-weight: 500; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .muted { color: var(--muted-text-color); font-variant-numeric: tabular-nums; }
+  .small { font-size: 13px; }
+  .field-label { display: grid; gap: 4px; }
+
+  /* "Read as" choice drawn as a row of segmented buttons. */
+  .format-choice { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--border-color); border-radius: 5px; overflow: hidden; width: fit-content; }
+  .format-choice label { padding: 7px 14px; cursor: pointer; border-right: 1px solid var(--border-color); }
+  .format-choice label:last-child { border-right: none; }
+  .format-choice input { position: absolute; opacity: 0; pointer-events: none; }
+  .format-choice label:has(input:checked) { background: var(--accent-color); color: var(--accent-text-color); font-weight: 600; }
+  .format-choice label:has(input:focus-visible) { outline: 2px solid var(--accent-color); outline-offset: -2px; }
+
+  .warning-message { background: var(--warning-background); color: var(--warning-text-color); border-radius: 5px; padding: 8px 10px; margin: 0; }
+
+  /* One row per format: name, value, copy button. */
+  .result-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border-color); border-radius: 5px; }
+  .result-list li {
+    display: grid;
+    grid-template-columns: 170px minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 10px;
+  }
+  .result-list li + li { border-top: 1px solid var(--border-color); }
+  .result-name { color: var(--muted-text-color); font-size: 13px; }
+  .result-value { font-family: var(--mono-font); overflow-wrap: anywhere; }
+
+  /* Phones: 16px inputs stop iOS from zooming in on focus; rows stack. */
+  @media (max-width: 640px) {
+    input[type="text"], select { font-size: 16px; }
+    input.value-input { font-size: 20px; }
+    .result-list li { grid-template-columns: minmax(0, 1fr) auto; }
+    .result-name { grid-column: 1 / -1; }
+    .section-header .actions span:empty { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Timestamp converter</h1>
+    <p class="intro">Paste a Unix timestamp or a date to see it in every common format and in any time zone. Nothing leaves this page.</p>
+  </header>
+
+  <!-- The value to convert, how to read it, and which zone to use -->
+  <section aria-labelledby="valueHeading">
+    <div class="section-header">
+      <h2 id="valueHeading">Timestamp</h2>
+      <button type="button" class="secondary" id="nowButton">Now</button>
+    </div>
+    <input type="text" class="value-input" id="valueInput" autocomplete="off" spellcheck="false" aria-label="Timestamp to convert" aria-describedby="valueHint">
+    <div class="format-choice" role="radiogroup" aria-label="Read the value as">
+      <label><input type="radio" name="readAs" value="auto" checked> Auto</label>
+      <label><input type="radio" name="readAs" value="seconds"> Seconds</label>
+      <label><input type="radio" name="readAs" value="milliseconds"> Millis</label>
+      <label><input type="radio" name="readAs" value="microseconds"> Micros</label>
+      <label><input type="radio" name="readAs" value="nanoseconds"> Nanos</label>
+      <label><input type="radio" name="readAs" value="date"> Date</label>
+    </div>
+    <label class="field-label">Time zone
+      <select id="zoneSelect"></select>
+    </label>
+    <div class="muted small" id="valueHint">Auto picks the unit from the number of digits: up to 11 is seconds, 12 to 14 millis, 15 and 16 micros, 17 and up nanos. Dates look like 2026-11-05 14:30 or Thu, 05 Nov 2026 14:30:00 GMT. A date with no zone of its own is read in the time zone above. Results are shown to the millisecond.</div>
+    <p class="warning-message" id="valueMessage" hidden></p>
+  </section>
+
+  <!-- The same moment in every format -->
+  <section aria-labelledby="resultHeading">
+    <div class="section-header">
+      <h2 id="resultHeading">Result</h2>
+      <span class="muted" id="copyStatus" aria-live="polite"></span>
+    </div>
+    <ul class="result-list" id="resultList"></ul>
+  </section>
+
+  <!-- Time between the value above and a second timestamp -->
+  <section aria-labelledby="differenceHeading">
+    <h2 id="differenceHeading">Difference</h2>
+    <label class="field-label">Compare with (empty means now)
+      <input type="text" id="compareInput" autocomplete="off" spellcheck="false" placeholder="now" style="font-family:var(--mono-font)">
+    </label>
+    <p class="warning-message" id="compareMessage" hidden></p>
+    <ul class="result-list" id="differenceList"></ul>
+  </section>
+
+  <!-- Link that reopens the page with the value filled in -->
+  <section aria-labelledby="linkHeading">
+    <div class="section-header">
+      <h2 id="linkHeading">Link to this value</h2>
+      <div class="actions">
+        <span class="muted" id="linkCopyStatus" aria-live="polite"></span>
+        <button type="button" class="secondary" id="copyLinkButton">Copy link</button>
+      </div>
+    </div>
+    <input type="text" id="pageLinkOutput" readonly spellcheck="false" aria-label="Link to this page with the current value">
+  </section>
+</main>
+
+<script>
+  const MILLISECONDS_PER_DAY = 86400000;
+
+  // Years outside this range cannot be written as a four-digit year.
+  const EARLIEST_YEAR = 1;
+  const LATEST_YEAR = 9999;
+
+  // How many of each unit fit in one millisecond's worth of the timestamp.
+  const UNITS_PER_MILLISECOND = {
+    seconds: null,
+    milliseconds: 1n,
+    microseconds: 1000n,
+    nanoseconds: 1000000n,
+  };
+
+  const MONTH_NAME_PATTERN = /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\b/i;
+  const ZONE_IN_TEXT_PATTERN = /(\b(gmt|utc|ut)\b|\bz$|[+-]\d{2}:?\d{2}\b)/i;
+
+  // Page elements we read from or write to.
+  const valueInput = document.getElementById('valueInput');
+  const readAsRadios = document.querySelectorAll('input[name="readAs"]');
+  const zoneSelect = document.getElementById('zoneSelect');
+  const nowButton = document.getElementById('nowButton');
+  const valueMessage = document.getElementById('valueMessage');
+  const resultList = document.getElementById('resultList');
+  const copyStatus = document.getElementById('copyStatus');
+  const compareInput = document.getElementById('compareInput');
+  const compareMessage = document.getElementById('compareMessage');
+  const differenceList = document.getElementById('differenceList');
+  const pageLinkOutput = document.getElementById('pageLinkOutput');
+  const copyLinkButton = document.getElementById('copyLinkButton');
+  const linkCopyStatus = document.getElementById('linkCopyStatus');
+
+  const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+  /* ---------- Time zone arithmetic ---------- */
+
+  const zoneFormatters = new Map();
+
+  /** One reusable formatter per zone; creating them is slow. */
+  function zoneFormatter(zoneName) {
+    if (!zoneFormatters.has(zoneName)) {
+      zoneFormatters.set(zoneName, new Intl.DateTimeFormat('en-US', {
+        timeZone: zoneName,
+        hourCycle: 'h23',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }));
+    }
+    return zoneFormatters.get(zoneName);
+  }
+
+  /** The date and time a wall clock in this zone shows at a moment. */
+  function wallClockParts(utcMilliseconds, zoneName) {
+    const clockParts = {};
+    zoneFormatter(zoneName).formatToParts(new Date(utcMilliseconds)).forEach((datePart) => {
+      if (datePart.type !== 'literal') clockParts[datePart.type] = Number(datePart.value);
+    });
+    return clockParts;
+  }
+
+  /** Milliseconds for a calendar date read as UTC. setUTCFullYear keeps years below 100 as written. */
+  function calendarToMilliseconds(year, month, day, hour = 0, minute = 0, second = 0, millisecond = 0) {
+    const calendarDate = new Date(0);
+    calendarDate.setUTCFullYear(year, month - 1, day);
+    calendarDate.setUTCHours(hour, minute, second, millisecond);
+    return calendarDate.getTime();
+  }
+
+  /** How far this zone is ahead of UTC at a moment, in milliseconds. */
+  function zoneOffsetAt(utcMilliseconds, zoneName) {
+    const wholeSecond = Math.floor(utcMilliseconds / 1000) * 1000;
+    const clockParts = wallClockParts(wholeSecond, zoneName);
+    const wallMilliseconds = calendarToMilliseconds(
+      clockParts.year, clockParts.month, clockParts.day,
+      clockParts.hour, clockParts.minute, clockParts.second,
+    );
+    return wallMilliseconds - wholeSecond;
+  }
+
+  /**
+   * Turn a wall clock time in a zone into a moment. When clocks change, a wall
+   * time can happen twice ("repeated", the earlier one is returned) or not at
+   * all ("skipped", it is moved forward by the size of the jump).
+   */
+  function wallClockToUtc(wallMilliseconds, zoneName) {
+    const offsetBefore = zoneOffsetAt(wallMilliseconds - MILLISECONDS_PER_DAY, zoneName);
+    const offsetAfter = zoneOffsetAt(wallMilliseconds + MILLISECONDS_PER_DAY, zoneName);
+    const possibleMoments = [...new Set([wallMilliseconds - offsetBefore, wallMilliseconds - offsetAfter])]
+      .filter((candidateMoment) => candidateMoment + zoneOffsetAt(candidateMoment, zoneName) === wallMilliseconds)
+      .sort((firstMoment, secondMoment) => firstMoment - secondMoment);
+
+    if (possibleMoments.length === 0) return { utcMilliseconds: wallMilliseconds - offsetBefore, clockChange: 'skipped' };
+    return { utcMilliseconds: possibleMoments[0], clockChange: possibleMoments.length > 1 ? 'repeated' : '' };
+  }
+
+  /* ---------- Reading the input ---------- */
+
+  /** Turn an offset like +01, +0100 or -05:30 into milliseconds. */
+  function parseOffsetText(offsetText) {
+    const offsetMatch = offsetText.match(/^([+-])(\d{1,2})(?::?(\d{2}))?$/);
+    const offsetMinutes = Number(offsetMatch[2]) * 60 + Number(offsetMatch[3] || 0);
+    return (offsetMatch[1] === '-' ? -1 : 1) * offsetMinutes * 60000;
+  }
+
+  /** Read a written number as a moment. Returns the moment and the unit it was read in. */
+  function parseNumberText(numberText, readAs) {
+    const isWholeNumber = /^-?\d+$/.test(numberText);
+    const digitCount = numberText.replace(/\D/g, '').length;
+
+    let unitName = readAs;
+    if (unitName === 'auto') {
+      if (!isWholeNumber || digitCount <= 11) unitName = 'seconds';
+      else if (digitCount <= 14) unitName = 'milliseconds';
+      else if (digitCount <= 16) unitName = 'microseconds';
+      else unitName = 'nanoseconds';
+    }
+
+    if (unitName === 'seconds') {
+      return { utcMilliseconds: Math.round(Number(numberText) * 1000), readAsText: 'Unix seconds' };
+    }
+    if (!isWholeNumber) throw new Error(`"${numberText}" has decimals. Only seconds can have decimals.`);
+    // BigInt division keeps long nanosecond values exact down to the millisecond.
+    const wholeMilliseconds = BigInt(numberText) / UNITS_PER_MILLISECOND[unitName];
+    return { utcMilliseconds: Number(wholeMilliseconds), readAsText: `Unix ${unitName}` };
+  }
+
+  /**
+   * Read a date written as year-month-day, with optional time and zone.
+   * Returns null when the text does not have that shape.
+   */
+  function parseNumericDateText(dateText, zoneName) {
+    const dateMatch = dateText.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[T\s]+(\d{1,2})(?::?(\d{2}))?(?::?(\d{2}))?(?:[.,](\d{1,9}))?)?\s*(Z|UTC|GMT|[+-]\d{1,2}(?::?\d{2})?)?$/i);
+    if (!dateMatch) return null;
+
+    const [year, month, day] = [dateMatch[1], dateMatch[2], dateMatch[3]].map(Number);
+    const hour = Number(dateMatch[4] || 0);
+    const minute = Number(dateMatch[5] || 0);
+    const second = Number(dateMatch[6] || 0);
+    const millisecond = Number((dateMatch[7] || '').padEnd(3, '0').slice(0, 3));
+    if (hour > 23 || minute > 59 || second > 59) throw new Error(`"${dateText}" has a time that does not exist.`);
+
+    const wallMilliseconds = calendarToMilliseconds(year, month, day, hour, minute, second, millisecond);
+    // A date like February 31 rolls over into March, which shows up here.
+    const checkDate = new Date(wallMilliseconds);
+    if (checkDate.getUTCMonth() + 1 !== month || checkDate.getUTCDate() !== day) {
+      throw new Error(`"${dateText}" has a date that does not exist.`);
+    }
+
+    const zoneText = dateMatch[8];
+    if (zoneText) {
+      const offsetMilliseconds = /^[+-]/.test(zoneText) ? parseOffsetText(zoneText) : 0;
+      return { utcMilliseconds: wallMilliseconds - offsetMilliseconds, readAsText: 'date with its own zone' };
+    }
+    return { ...wallClockToUtc(wallMilliseconds, zoneName), readAsText: `date in ${zoneName}` };
+  }
+
+  /**
+   * Read a date with a month name, such as an RFC 2822 date. The browser does
+   * the parsing. Without a zone in the text it reads the browser's zone, so the
+   * wall time is taken from there and moved to the picked zone.
+   */
+  function parseNamedDateText(dateText, zoneName) {
+    if (!MONTH_NAME_PATTERN.test(dateText) || !/\b\d{4}\b/.test(dateText)) return null;
+    const parsedDate = new Date(dateText);
+    if (Number.isNaN(parsedDate.getTime())) return null;
+    if (ZONE_IN_TEXT_PATTERN.test(dateText)) {
+      return { utcMilliseconds: parsedDate.getTime(), readAsText: 'date with its own zone' };
+    }
+    const wallMilliseconds = calendarToMilliseconds(
+      parsedDate.getFullYear(), parsedDate.getMonth() + 1, parsedDate.getDate(),
+      parsedDate.getHours(), parsedDate.getMinutes(), parsedDate.getSeconds(), parsedDate.getMilliseconds(),
+    );
+    return { ...wallClockToUtc(wallMilliseconds, zoneName), readAsText: `date in ${zoneName}` };
+  }
+
+  /** Read any supported text as a moment. Throws an Error with a readable message. */
+  function parseTimestampText(rawText, readAs, zoneName) {
+    const cleanText = rawText.trim();
+    const numberText = cleanText.replace(/[\s_]/g, '');
+    const looksLikeNumber = /^-?\d+(\.\d+)?$/.test(numberText);
+
+    let parsedMoment = null;
+    if (/^now$/i.test(cleanText)) {
+      parsedMoment = { utcMilliseconds: Date.now(), readAsText: 'the current time' };
+    } else if (looksLikeNumber && readAs !== 'date') {
+      parsedMoment = parseNumberText(numberText, readAs);
+    } else if (!looksLikeNumber) {
+      if (readAs !== 'auto' && readAs !== 'date') throw new Error(`"${cleanText}" is not a number of ${readAs}.`);
+      parsedMoment = parseNumericDateText(cleanText, zoneName) ?? parseNamedDateText(cleanText, zoneName);
+    }
+    if (!parsedMoment) throw new Error(`"${cleanText}" could not be read. Dates should look like 2026-11-05 14:30.`);
+
+    const momentDate = new Date(parsedMoment.utcMilliseconds);
+    const utcYear = momentDate.getUTCFullYear();
+    if (Number.isNaN(utcYear) || utcYear < EARLIEST_YEAR || utcYear > LATEST_YEAR) {
+      throw new Error(`"${cleanText}" is outside the years ${EARLIEST_YEAR} to ${LATEST_YEAR}. Is the unit right?`);
+    }
+    return parsedMoment;
+  }
+
+  /* ---------- Writing the formats ---------- */
+
+  const padTwo = (numberValue) => String(numberValue).padStart(2, '0');
+  const padFourYear = (yearValue) => String(yearValue).padStart(4, '0');
+
+  /** An offset in milliseconds as +01:00. Old local-mean-time offsets also get seconds. */
+  function formatOffset(offsetMilliseconds) {
+    const offsetSeconds = Math.abs(offsetMilliseconds) / 1000;
+    const signText = offsetMilliseconds < 0 ? '-' : '+';
+    const hourText = padTwo(Math.floor(offsetSeconds / 3600));
+    const minuteText = padTwo(Math.floor(offsetSeconds / 60) % 60);
+    const secondCount = offsetSeconds % 60;
+    return `${signText}${hourText}:${minuteText}${secondCount ? ':' + padTwo(secondCount) : ''}`;
+  }
+
+  /** The zone's wall clock as year-month-day and hour:minute:second strings. */
+  function wallClockStrings(utcMilliseconds, zoneName) {
+    const clockParts = wallClockParts(utcMilliseconds, zoneName);
+    const millisecondCount = ((utcMilliseconds % 1000) + 1000) % 1000;
+    return {
+      clockParts,
+      dateText: `${padFourYear(clockParts.year)}-${padTwo(clockParts.month)}-${padTwo(clockParts.day)}`,
+      timeText: `${padTwo(clockParts.hour)}:${padTwo(clockParts.minute)}:${padTwo(clockParts.second)}`,
+      fractionText: millisecondCount ? '.' + String(millisecondCount).padStart(3, '0') : '',
+      sqlFractionText: '.' + String(millisecondCount).padStart(3, '0'),
+    };
+  }
+
+  /** ISO 8601 with the zone's own offset. */
+  function formatIsoInZone(utcMilliseconds, zoneName) {
+    const { dateText, timeText, fractionText } = wallClockStrings(utcMilliseconds, zoneName);
+    return `${dateText}T${timeText}${fractionText}${formatOffset(zoneOffsetAt(utcMilliseconds, zoneName))}`;
+  }
+
+  /** Long, readable date and time in a zone. */
+  function formatReadable(utcMilliseconds, zoneName) {
+    return new Intl.DateTimeFormat('en-GB', { timeZone: zoneName, dateStyle: 'full', timeStyle: 'long' })
+      .format(new Date(utcMilliseconds));
+  }
+
+  /** Time from now, such as "in 3 days" or "2 hours ago". */
+  function formatRelative(utcMilliseconds) {
+    const relativeFormatter = new Intl.RelativeTimeFormat('en', { numeric: 'always' });
+    const differenceSeconds = (utcMilliseconds - Date.now()) / 1000;
+    const unitSizes = [
+      ['year', 31557600], ['month', 2629800], ['day', 86400],
+      ['hour', 3600], ['minute', 60], ['second', 1],
+    ];
+    const [unitName, unitSeconds] = unitSizes.find(([, sizeSeconds]) => Math.abs(differenceSeconds) >= sizeSeconds) ?? unitSizes[5];
+    return relativeFormatter.format(Math.trunc(differenceSeconds / unitSeconds), unitName);
+  }
+
+  /** ISO 8601 week: the week belongs to the year that holds its Thursday. */
+  function isoWeekText(clockParts) {
+    const dayMilliseconds = calendarToMilliseconds(clockParts.year, clockParts.month, clockParts.day);
+    const mondayBasedWeekday = (new Date(dayMilliseconds).getUTCDay() + 6) % 7;
+    const thursdayDate = new Date(dayMilliseconds + (3 - mondayBasedWeekday) * MILLISECONDS_PER_DAY);
+    const thursdayYear = thursdayDate.getUTCFullYear();
+    const firstDayOfYear = calendarToMilliseconds(thursdayYear, 1, 1);
+    const weekNumber = Math.floor((thursdayDate.getTime() - firstDayOfYear) / MILLISECONDS_PER_DAY / 7) + 1;
+    return `${padFourYear(thursdayYear)}-W${padTwo(weekNumber)}`;
+  }
+
+  /** Day number within the year, where January 1 is 1. */
+  function dayOfYear(clockParts) {
+    const dayMilliseconds = calendarToMilliseconds(clockParts.year, clockParts.month, clockParts.day);
+    return (dayMilliseconds - calendarToMilliseconds(clockParts.year, 1, 1)) / MILLISECONDS_PER_DAY + 1;
+  }
+
+  /** Every format as [name, value] rows. */
+  function buildResultRows(utcMilliseconds, zoneName) {
+    const { clockParts, dateText, timeText, sqlFractionText } = wallClockStrings(utcMilliseconds, zoneName);
+    const weekdayName = new Intl.DateTimeFormat('en-GB', { timeZone: zoneName, weekday: 'long' }).format(new Date(utcMilliseconds));
+
+    const resultRows = [
+      ['Unix seconds', String(utcMilliseconds / 1000)],
+      ['Unix milliseconds', String(utcMilliseconds)],
+      ['ISO 8601, UTC', new Date(utcMilliseconds).toISOString()],
+      [`ISO 8601, ${zoneName}`, formatIsoInZone(utcMilliseconds, zoneName)],
+      [`Readable, ${zoneName}`, formatReadable(utcMilliseconds, zoneName)],
+    ];
+    if (zoneName !== browserZone) {
+      resultRows.push([`Readable, ${browserZone}`, formatReadable(utcMilliseconds, browserZone)]);
+    }
+    resultRows.push(
+      ['SQL datetime', `${dateText} ${timeText}${sqlFractionText}`],
+      ['RFC 7231 (HTTP)', new Date(utcMilliseconds).toUTCString()],
+      ['From now', formatRelative(utcMilliseconds)],
+      ['Weekday', weekdayName],
+      ['ISO week', isoWeekText(clockParts)],
+      ['Day of year', String(dayOfYear(clockParts))],
+    );
+    return resultRows;
+  }
+
+  /** Build the difference rows between two moments. */
+  function buildDifferenceRows(firstMilliseconds, secondMilliseconds) {
+    const differenceMilliseconds = Math.abs(secondMilliseconds - firstMilliseconds);
+    const totalSeconds = Math.floor(differenceMilliseconds / 1000);
+    const dayCount = Math.floor(totalSeconds / 86400);
+    const hourCount = Math.floor(totalSeconds / 3600) % 24;
+    const minuteCount = Math.floor(totalSeconds / 60) % 60;
+    const secondCount = totalSeconds % 60;
+
+    let directionText = 'The two timestamps are the same.';
+    if (firstMilliseconds < secondMilliseconds) directionText = 'The compared timestamp is later.';
+    if (firstMilliseconds > secondMilliseconds) directionText = 'The compared timestamp is earlier.';
+
+    return [
+      ['Difference', `${dayCount} d ${hourCount} h ${minuteCount} min ${secondCount} s`],
+      ['Direction', directionText],
+      ['Total days', (differenceMilliseconds / MILLISECONDS_PER_DAY).toLocaleString('en-US', { maximumFractionDigits: 3 })],
+      ['Total hours', (differenceMilliseconds / 3600000).toLocaleString('en-US', { maximumFractionDigits: 3 })],
+      ['Total minutes', (differenceMilliseconds / 60000).toLocaleString('en-US', { maximumFractionDigits: 3 })],
+      ['Total seconds', (differenceMilliseconds / 1000).toLocaleString('en-US', { maximumFractionDigits: 3 })],
+    ];
+  }
+
+  /* ---------- Drawing the page ---------- */
+
+  /** Draw [name, value] rows, each with a copy button. */
+  function renderRows(listElement, resultRows) {
+    listElement.replaceChildren();
+    resultRows.forEach(([rowName, rowValue]) => {
+      const listItem = document.createElement('li');
+
+      const nameText = document.createElement('span');
+      nameText.className = 'result-name';
+      nameText.textContent = rowName;
+
+      const valueText = document.createElement('span');
+      valueText.className = 'result-value';
+      valueText.textContent = rowValue;
+
+      const copyButton = document.createElement('button');
+      copyButton.type = 'button';
+      copyButton.className = 'secondary small-button';
+      copyButton.textContent = 'Copy';
+      copyButton.dataset.copyValue = rowValue;
+      copyButton.setAttribute('aria-label', `Copy ${rowName}`);
+
+      listItem.append(nameText, valueText, copyButton);
+      listElement.appendChild(listItem);
+    });
+  }
+
+  function selectedReadAs() {
+    return [...readAsRadios].find((readAsRadio) => readAsRadio.checked).value;
+  }
+
+  function showMessage(messageElement, messageText) {
+    messageElement.textContent = messageText;
+    messageElement.hidden = !messageText;
+  }
+
+  /** Explain what the page did with the input, including clock changes. */
+  function describeParsedMoment(parsedMoment, zoneName) {
+    if (parsedMoment.clockChange === 'skipped') {
+      return `This time does not exist in ${zoneName}, because the clocks jump forward here. It is shown after the jump.`;
+    }
+    if (parsedMoment.clockChange === 'repeated') {
+      return `This time happens twice in ${zoneName}, because the clocks go back here. The first one is shown.`;
+    }
+    return '';
+  }
+
+  /** Re-read everything and redraw. */
+  function refresh() {
+    const zoneName = zoneSelect.value;
+    copyStatus.textContent = '';
+    linkCopyStatus.textContent = '';
+    pageLinkOutput.value = buildPageLink();
+
+    let parsedMoment = null;
+    if (valueInput.value.trim() !== '') {
+      try {
+        parsedMoment = parseTimestampText(valueInput.value, selectedReadAs(), zoneName);
+        showMessage(valueMessage, describeParsedMoment(parsedMoment, zoneName));
+      } catch (parseError) {
+        showMessage(valueMessage, parseError.message);
+        valueInput.classList.add('invalid');
+      }
+    } else {
+      showMessage(valueMessage, '');
+    }
+    if (parsedMoment || valueInput.value.trim() === '') valueInput.classList.remove('invalid');
+
+    renderRows(resultList, parsedMoment ? buildResultRows(parsedMoment.utcMilliseconds, zoneName) : []);
+    resultList.hidden = !parsedMoment;
+    if (parsedMoment) copyStatus.textContent = `Read as ${parsedMoment.readAsText}`;
+
+    refreshDifference(parsedMoment, zoneName);
+  }
+
+  /** Redraw the difference between the value and the comparison box. */
+  function refreshDifference(parsedMoment, zoneName) {
+    let compareMoment = null;
+    showMessage(compareMessage, '');
+    try {
+      compareMoment = compareInput.value.trim() === ''
+        ? Date.now()
+        : parseTimestampText(compareInput.value, 'auto', zoneName).utcMilliseconds;
+    } catch (parseError) {
+      showMessage(compareMessage, parseError.message);
+    }
+    const canCompare = parsedMoment && compareMoment !== null;
+    renderRows(differenceList, canCompare ? buildDifferenceRows(parsedMoment.utcMilliseconds, compareMoment) : []);
+    differenceList.hidden = !canCompare;
+  }
+
+  /** Fill the zone list: every zone the browser knows, with UTC first. */
+  function fillZoneSelect() {
+    const knownZones = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
+    const zoneNames = [...new Set(['UTC', browserZone, ...knownZones])];
+    zoneNames.forEach((zoneName) => {
+      const zoneOption = document.createElement('option');
+      zoneOption.value = zoneName;
+      zoneOption.textContent = zoneName;
+      zoneSelect.appendChild(zoneOption);
+    });
+    zoneSelect.value = browserZone;
+  }
+
+  /* ---------- Clipboard ---------- */
+
+  /** Put text on the clipboard, with the older copy command as a fallback. */
+  async function writeToClipboard(plainText) {
+    try {
+      await navigator.clipboard.writeText(plainText);
+      return true;
+    } catch (clipboardError) {
+      const fillClipboard = (copyEvent) => {
+        copyEvent.clipboardData.setData('text/plain', plainText);
+        copyEvent.preventDefault();
+      };
+      document.addEventListener('copy', fillClipboard, { once: true });
+      const copySucceeded = document.execCommand('copy');
+      document.removeEventListener('copy', fillClipboard);
+      return copySucceeded;
+    }
+  }
+
+  /* ---------- Link with the value filled in ---------- */
+
+  /**
+   * Encode only the characters that would break the query string (% & = # +)
+   * and line breaks. Spaces stay as plain spaces so the link is readable.
+   */
+  function encodeQueryPart(rawText) {
+    return rawText
+      .replace(/%/g, '%25').replace(/&/g, '%26').replace(/=/g, '%3D')
+      .replace(/#/g, '%23').replace(/\+/g, '%2B')
+      .replace(/\r?\n/g, '%0A').replace(/\t/g, '%09');
+  }
+
+  /** This page's address with the value, unit, zone and comparison. */
+  function buildPageLink() {
+    const pageAddress = window.location.href.split(/[?#]/)[0];
+    const queryParts = [];
+    if (valueInput.value.trim()) queryParts.push(`value=${encodeQueryPart(valueInput.value.trim())}`);
+    if (selectedReadAs() !== 'auto') queryParts.push(`as=${selectedReadAs()}`);
+    queryParts.push(`zone=${encodeQueryPart(zoneSelect.value)}`);
+    if (compareInput.value.trim()) queryParts.push(`compare=${encodeQueryPart(compareInput.value.trim())}`);
+    return `${pageAddress}?${queryParts.join('&')}`;
+  }
+
+  /** Read one ?name=... from the address. Plain spaces, + and %20 all mean a space. */
+  function readQueryParameter(parameterName) {
+    const parameterMatch = window.location.search.match(new RegExp(`[?&]${parameterName}=([^&]*)`));
+    if (!parameterMatch) return null;
+    const withSpaces = parameterMatch[1].replace(/\+/g, ' ');
+    try { return decodeURIComponent(withSpaces); } catch (decodeError) { return withSpaces; }
+  }
+
+  /* ---------- Events ---------- */
+
+  [valueInput, compareInput].forEach((inputElement) => inputElement.addEventListener('input', refresh));
+  zoneSelect.addEventListener('change', refresh);
+  readAsRadios.forEach((readAsRadio) => readAsRadio.addEventListener('change', refresh));
+
+  // Now always writes whole seconds, so the Auto choice keeps reading it correctly.
+  nowButton.addEventListener('click', () => {
+    valueInput.value = String(Math.floor(Date.now() / 1000));
+    [...readAsRadios].find((readAsRadio) => readAsRadio.value === 'auto').checked = true;
+    refresh();
+  });
+
+  // One listener per list covers every copy button in it.
+  [resultList, differenceList].forEach((listElement) => listElement.addEventListener('click', async (clickEvent) => {
+    const copyValue = clickEvent.target.dataset.copyValue;
+    if (copyValue === undefined) return;
+    const copySucceeded = await writeToClipboard(copyValue);
+    copyStatus.textContent = copySucceeded ? `Copied ${copyValue}` : 'Your browser blocked the clipboard.';
+  }));
+
+  copyLinkButton.addEventListener('click', async () => {
+    const copySucceeded = await writeToClipboard(pageLinkOutput.value);
+    if (!copySucceeded) pageLinkOutput.select();
+    linkCopyStatus.textContent = copySucceeded ? 'Copied' : 'Selected. Press Ctrl+C to copy.';
+  });
+
+  /* ---------- Start ---------- */
+
+  fillZoneSelect();
+
+  const zoneFromAddress = readQueryParameter('zone');
+  if (zoneFromAddress && [...zoneSelect.options].some((zoneOption) => zoneOption.value === zoneFromAddress)) {
+    zoneSelect.value = zoneFromAddress;
+  }
+  const readAsFromAddress = readQueryParameter('as');
+  const readAsRadioFromAddress = [...readAsRadios].find((readAsRadio) => readAsRadio.value === readAsFromAddress);
+  if (readAsRadioFromAddress) readAsRadioFromAddress.checked = true;
+  compareInput.value = readQueryParameter('compare') ?? '';
+  valueInput.value = readQueryParameter('value') ?? String(Math.floor(Date.now() / 1000));
+  refresh();
+</script>
+</body>
+</html>

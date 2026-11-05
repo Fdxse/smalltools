@@ -10,6 +10,10 @@ Small, self-contained browser tools. Each tool is a single HTML file with no dep
 | Table converter | [table-converter.html](table-converter.html) | Reads a pasted Markdown, CSV (comma or semicolon) or Excel/Word table and copies it out as Markdown, CSV, Excel or Word |
 | Pairwise test cases | [pairwise.html](pairwise.html) | Builds a small set of test rows that covers every pair of values across fields with any number of values, instead of every combination |
 | Decision table | [decision-table.html](decision-table.html) | Every combination of up to 8 two-state fields plus an Expected result column, filled in by simple first-match rules with a default |
+| Timestamp converter | [timestamp-converter.html](timestamp-converter.html) | Converts Unix timestamps and dates between formats and time zones, and shows the difference between two timestamps |
+| UUID generator | [uuid-generator.html](uuid-generator.html) | Generates UUID v4 and v7 in bulk in several formats, and decodes the version and time from an existing UUID |
+| Cron explainer | [cron-explainer.html](cron-explainer.html) | Explains a Unix, six-field or Quartz cron expression in plain English and lists its next runs in any time zone |
+| QR code generator | [qr-code.html](qr-code.html) | Builds a QR code from text, a link or Wi-Fi details, and saves it as PNG or SVG |
 
 `index.html` is a start page that links to every tool listed in `tools.json`.
 To add a tool, drop its HTML file in the repo and add an entry to `tools.json`:

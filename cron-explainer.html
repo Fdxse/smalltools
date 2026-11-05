@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cron explainer</title>
+<style>
+  /* Same colour scheme and layout as flag-decoder.html. */
+  :root {
+    --page-background: #f3f5f8;
+    --panel-background: #ffffff;
+    --text-color: #1b2230;
+    --muted-text-color: #5b6477;
+    --border-color: #d6dbe4;
+    --accent-color: #2457d6;
+    --accent-text-color: #ffffff;
+    --highlight-background: #e3f3e8;
+    --warning-background: #fff3d6;
+    --warning-text-color: #6b4a00;
+    --body-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono-font: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page-background: #13161c;
+      --panel-background: #1c2028;
+      --text-color: #e5e8ee;
+      --muted-text-color: #98a1b3;
+      --border-color: #323947;
+      --accent-color: #7ea1ff;
+      --accent-text-color: #0f1420;
+      --highlight-background: #1d3828;
+      --warning-background: #3a3018;
+      --warning-text-color: #f1d48a;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page-background: #13161c;
+    --panel-background: #1c2028;
+    --text-color: #e5e8ee;
+    --muted-text-color: #98a1b3;
+    --border-color: #323947;
+    --accent-color: #7ea1ff;
+    --accent-text-color: #0f1420;
+    --highlight-background: #1d3828;
+    --warning-background: #3a3018;
+    --warning-text-color: #f1d48a;
+    color-scheme: dark;
+  }
+
+  /* Sections and grids set their own display, which would otherwise beat the hidden attribute. */
+  [hidden] { display: none !important; }
+
+  body {
+    margin: 0;
+    background: var(--page-background);
+    color: var(--text-color);
+    font-family: var(--body-font);
+    font-size: 15px;
+  }
+  main {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 24px 16px 40px;
+    display: grid;
+    gap: 18px;
+  }
+  h1 { margin: 0; font-size: 24px; text-wrap: balance; }
+  h2 { margin: 0; font-size: 16px; }
+  .intro { margin: 6px 0 0; color: var(--muted-text-color); max-width: 65ch; }
+
+  section {
+    background: var(--panel-background);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 0;
+    display: grid;
+    gap: 12px;
+  }
+  .section-header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+
+  input[type="text"], select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background: var(--page-background);
+    color: var(--text-color);
+    font: inherit;
+  }
+  input.value-input { font-family: var(--mono-font); font-size: 20px; padding: 9px 11px; }
+  input.value-input.invalid { border-color: #d64545; }
+  input:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 1px; }
+
+  button {
+    padding: 8px 14px;
+    border: 1px solid var(--accent-color);
+    border-radius: 5px;
+    background: var(--accent-color);
+    color: var(--accent-text-color);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--accent-color); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .muted { color: var(--muted-text-color); font-variant-numeric: tabular-nums; }
+  .small { font-size: 13px; }
+  .option-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .field-label { display: grid; gap: 4px; min-width: 0; }
+
+  /* Dialect choice drawn as a row of segmented buttons. */
+  .format-choice { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--border-color); border-radius: 5px; overflow: hidden; width: fit-content; }
+  .format-choice label { padding: 7px 14px; cursor: pointer; border-right: 1px solid var(--border-color); }
+  .format-choice label:last-child { border-right: none; }
+  .format-choice input { position: absolute; opacity: 0; pointer-events: none; }
+  .format-choice label:has(input:checked) { background: var(--accent-color); color: var(--accent-text-color); font-weight: 600; }
+  .format-choice label:has(input:focus-visible) { outline: 2px solid var(--accent-color); outline-offset: -2px; }
+
+  .warning-message { background: var(--warning-background); color: var(--warning-text-color); border-radius: 5px; padding: 8px 10px; margin: 0; }
+  .explanation { background: var(--highlight-background); border-radius: 5px; padding: 12px 14px; margin: 0; font-size: 18px; font-weight: 600; text-wrap: pretty; }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 5px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { font-size: 13px; color: var(--muted-text-color); font-weight: 600; }
+  tr + tr td, tbody tr:first-child td { border-top: 1px solid var(--border-color); }
+  td.mono { font-family: var(--mono-font); white-space: nowrap; }
+
+  /* Phones: 16px inputs stop iOS from zooming in on focus. */
+  @media (max-width: 640px) {
+    input[type="text"], select { font-size: 16px; }
+    input.value-input { font-size: 20px; }
+    .section-header .actions span:empty { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Cron explainer</h1>
+    <p class="intro">Type a cron expression to get it in plain English, field by field, along with the next times it runs.</p>
+  </header>
+
+  <!-- The expression and how to read it -->
+  <section aria-labelledby="expressionHeading">
+    <div class="section-header">
+      <h2 id="expressionHeading">Expression</h2>
+      <div class="format-choice" role="radiogroup" aria-label="Cron dialect">
+        <label><input type="radio" name="dialect" value="unix" checked> Unix (5 fields)</label>
+        <label><input type="radio" name="dialect" value="seconds"> With seconds (6)</label>
+        <label><input type="radio" name="dialect" value="quartz"> Quartz (6 or 7)</label>
+      </div>
+    </div>
+    <input type="text" class="value-input" id="expressionInput" autocomplete="off" spellcheck="false" aria-label="Cron expression" aria-describedby="fieldOrderHint">
+    <div class="muted small" id="fieldOrderHint"></div>
+    <p class="warning-message" id="expressionMessage" hidden></p>
+    <p class="explanation" id="explanationOutput" aria-live="polite"></p>
+    <div class="actions">
+      <button type="button" class="secondary" id="copyExplanationButton">Copy explanation</button>
+      <span class="muted" id="explanationCopyStatus" aria-live="polite"></span>
+    </div>
+    <p class="warning-message" id="dayRuleMessage" hidden></p>
+    <label class="field-label">Examples
+      <select id="exampleSelect"></select>
+    </label>
+  </section>
+
+  <!-- One row per field -->
+  <section aria-labelledby="fieldsHeading" id="fieldsSection">
+    <h2 id="fieldsHeading">Fields</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Field</th><th scope="col">Written as</th><th scope="col">Means</th><th scope="col">Allowed</th></tr></thead>
+        <tbody id="fieldTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- The next times it runs -->
+  <section aria-labelledby="runsHeading" id="runsSection">
+    <div class="section-header">
+      <h2 id="runsHeading">Next runs</h2>
+      <div class="actions">
+        <span class="muted" id="runsCopyStatus" aria-live="polite"></span>
+        <button type="button" class="secondary" id="copyRunsButton">Copy runs</button>
+      </div>
+    </div>
+    <div class="option-row">
+      <label class="field-label">Time zone
+        <select id="zoneSelect"></select>
+      </label>
+      <label class="field-label">How many
+        <select id="runCountSelect">
+          <option value="5">5</option>
+          <option value="10" selected>10</option>
+          <option value="25">25</option>
+          <option value="50">50</option>
+        </select>
+      </label>
+    </div>
+    <p class="muted" id="noRunsMessage" hidden></p>
+    <div class="table-wrap" id="runsTableWrap">
+      <table>
+        <thead><tr><th scope="col">Time</th><th scope="col">Weekday</th><th scope="col">From now</th></tr></thead>
+        <tbody id="runsTableBody"></tbody>
+      </table>
+    </div>
+    <div class="muted small">When clocks go forward, a run in the skipped hour is left out. When they go back, a run in the repeated hour is listed once. Real schedulers differ in how they handle these hours.</div>
+  </section>
+
+  <!-- Link that reopens the page with the expression filled in -->
+  <section aria-labelledby="linkHeading">
+    <div class="section-header">
+      <h2 id="linkHeading">Link to this expression</h2>
+      <div class="actions">
+        <span class="muted" id="linkCopyStatus" aria-live="polite"></span>
+        <button type="button" class="secondary" id="copyLinkButton">Copy link</button>
+      </div>
+    </div>
+    <input type="text" id="pageLinkOutput" readonly spellcheck="false" aria-label="Link to this page with the current expression">
+  </section>
+</main>
+
+<script>
+  const MILLISECONDS_PER_SECOND = 1000;
+  const MILLISECONDS_PER_HOUR = 3600000;
+  const MILLISECONDS_PER_DAY = 86400000;
+  const OFFSET_CACHE_STEP_MILLISECONDS = 900000;
+
+  // How far ahead to look for runs. Rare dates like the fifth Monday of February need decades.
+  const SEARCH_YEARS = 40;
+  const SEARCH_DAYS = Math.round(SEARCH_YEARS * 365.25);
+
+  const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+  // Limits and wording for each field.
+  const FIELD_SPECS = {
+    second: { label: 'Second', unit: 'second', smallest: 0, largest: 59 },
+    minute: { label: 'Minute', unit: 'minute', smallest: 0, largest: 59 },
+    hour: { label: 'Hour', unit: 'hour', smallest: 0, largest: 23 },
+    dayOfMonth: { label: 'Day of month', unit: 'day', smallest: 1, largest: 31 },
+    month: { label: 'Month', unit: 'month', smallest: 1, largest: 12 },
+    dayOfWeek: { label: 'Day of week', unit: 'day', smallest: 0, largest: 7 },
+    year: { label: 'Year', unit: 'year', smallest: 1970, largest: 2099 },
+  };
+
+  const DIALECTS = {
+    unix: {
+      fieldNames: ['minute', 'hour', 'dayOfMonth', 'month', 'dayOfWeek'],
+      hint: 'minute · hour · day of month · month · day of week (0 and 7 are Sunday). Also takes @hourly, @daily, @weekly, @monthly and @yearly.',
+    },
+    seconds: {
+      fieldNames: ['second', 'minute', 'hour', 'dayOfMonth', 'month', 'dayOfWeek'],
+      hint: 'second · minute · hour · day of month · month · day of week (0 and 7 are Sunday).',
+    },
+    quartz: {
+      fieldNames: ['second', 'minute', 'hour', 'dayOfMonth', 'month', 'dayOfWeek', 'year'],
+      optionalLastField: true,
+      hint: 'second · minute · hour · day of month · month · day of week (1 is Sunday, 7 is Saturday) · optional year. One day field must be ?. Also takes L, W and #.',
+    },
+  };
+
+  const SCHEDULE_MACROS = {
+    '@yearly': '0 0 1 1 *',
+    '@annually': '0 0 1 1 *',
+    '@monthly': '0 0 1 * *',
+    '@weekly': '0 0 * * 0',
+    '@daily': '0 0 * * *',
+    '@midnight': '0 0 * * *',
+    '@hourly': '0 * * * *',
+  };
+
+  // Label, dialect and expression for the Examples list.
+  const EXAMPLES = [
+    ['Every 5 minutes', 'unix', '*/5 * * * *'],
+    ['Every hour, on the hour', 'unix', '0 * * * *'],
+    ['Every 15 minutes during office hours', 'unix', '*/15 8-17 * * 1-5'],
+    ['Weekdays at 09:00', 'unix', '0 9 * * 1-5'],
+    ['Every night at 02:30', 'unix', '30 2 * * *'],
+    ['First day of every month', 'unix', '0 0 1 * *'],
+    ['Every 10 seconds', 'seconds', '*/10 * * * * *'],
+    ['Quartz: last day of the month at noon', 'quartz', '0 0 12 L * ?'],
+    ['Quartz: last Friday of the month', 'quartz', '0 0 9 ? * 6L'],
+    ['Quartz: second Monday of the month', 'quartz', '0 0 9 ? * 2#2'],
+  ];
+
+  // Page elements we read from or write to.
+  const dialectRadios = document.querySelectorAll('input[name="dialect"]');
+  const expressionInput = document.getElementById('expressionInput');
+  const fieldOrderHint = document.getElementById('fieldOrderHint');
+  const expressionMessage = document.getElementById('expressionMessage');
+  const explanationOutput = document.getElementById('explanationOutput');
+  const copyExplanationButton = document.getElementById('copyExplanationButton');
+  const explanationCopyStatus = document.getElementById('explanationCopyStatus');
+  const dayRuleMessage = document.getElementById('dayRuleMessage');
+  const exampleSelect = document.getElementById('exampleSelect');
+  const fieldsSection = document.getElementById('fieldsSection');
+  const fieldTableBody = document.getElementById('fieldTableBody');
+  const runsSection = document.getElementById('runsSection');
+  const zoneSelect = document.getElementById('zoneSelect');
+  const runCountSelect = document.getElementById('runCountSelect');
+  const noRunsMessage = document.getElementById('noRunsMessage');
+  const runsTableWrap = document.getElementById('runsTableWrap');
+  const runsTableBody = document.getElementById('runsTableBody');
+  const copyRunsButton = document.getElementById('copyRunsButton');
+  const runsCopyStatus = document.getElementById('runsCopyStatus');
+  const pageLinkOutput = document.getElementById('pageLinkOutput');
+  const copyLinkButton = document.getElementById('copyLinkButton');
+  const linkCopyStatus = document.getElementById('linkCopyStatus');
+
+  const browserZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+  // The rows drawn in the runs table, kept for the copy button.
+  let currentRunRows = [];
+
+  /* ---------- Small text helpers ---------- */
+
+  const padTwo = (numberValue) => String(numberValue).padStart(2, '0');
+  const capitalise = (text) => text.charAt(0).toUpperCase() + text.slice(1);
+
+  /** 1 -> 1st, 2 -> 2nd, 11 -> 11th, 23 -> 23rd. */
+  function ordinal(numberValue) {
+    const lastTwoDigits = numberValue % 100;
+    if (lastTwoDigits >= 11 && lastTwoDigits <= 13) return `${numberValue}th`;
+    return numberValue + ({ 1: 'st', 2: 'nd', 3: 'rd' }[numberValue % 10] ?? 'th');
+  }
+
+  /** ["a", "b", "c"] -> "a, b and c". */
+  function joinWithAnd(textList) {
+    if (textList.length <= 1) return textList.join('');
+    return `${textList.slice(0, -1).join(', ')} and ${textList[textList.length - 1]}`;
+  }
+
+  /* ---------- Reading the expression ---------- */
+
+  /** Quartz numbers Sunday as 1; the rest of this page numbers it 0, as Unix does. */
+  function normaliseWeekday(writtenNumber, dialectName) {
+    return dialectName === 'quartz' ? writtenNumber - 1 : writtenNumber % 7;
+  }
+
+  /** The smallest and largest number a field takes in this dialect. */
+  function fieldLimits(fieldName, dialectName) {
+    const fieldSpec = FIELD_SPECS[fieldName];
+    if (fieldName === 'dayOfWeek' && dialectName === 'quartz') return { smallest: 1, largest: 7 };
+    return { smallest: fieldSpec.smallest, largest: fieldSpec.largest };
+  }
+
+  /** Read a number or a name (JAN, MON) in a field. Throws when it is outside the limits. */
+  function readFieldNumber(numberText, fieldName, dialectName) {
+    const { smallest, largest } = fieldLimits(fieldName, dialectName);
+    const fieldLabel = FIELD_SPECS[fieldName].label;
+    const upperText = numberText.toUpperCase();
+    let fieldNumber = null;
+
+    if (/^\d+$/.test(numberText)) fieldNumber = Number(numberText);
+    if (fieldName === 'month' && fieldNumber === null) {
+      const monthIndex = MONTH_NAMES.findIndex((monthName) => monthName.slice(0, 3).toUpperCase() === upperText);
+      if (monthIndex >= 0) fieldNumber = monthIndex + 1;
+    }
+    if (fieldName === 'dayOfWeek' && fieldNumber === null) {
+      const dayIndex = DAY_NAMES.findIndex((dayName) => dayName.slice(0, 3).toUpperCase() === upperText);
+      if (dayIndex >= 0) fieldNumber = dialectName === 'quartz' ? dayIndex + 1 : dayIndex;
+    }
+
+    if (fieldNumber === null) throw new Error(`${fieldLabel}: "${numberText}" is not a value this field takes.`);
+    if (fieldNumber < smallest || fieldNumber > largest) {
+      throw new Error(`${fieldLabel}: ${fieldNumber} is outside ${smallest} to ${largest}.`);
+    }
+    return fieldNumber;
+  }
+
+  /** Read the L, W and # forms from Quartz. Returns an item, or null for anything else. */
+  function readQuartzSpecialItem(partText, fieldName) {
+    const upperPart = partText.toUpperCase();
+
+    if (fieldName === 'dayOfMonth') {
+      if (upperPart === 'L') return { kind: 'special', specialType: 'lastDay', daysBefore: 0, text: 'the last day of the month' };
+      if (upperPart === 'LW') return { kind: 'special', specialType: 'lastWeekday', text: 'the last weekday (Monday to Friday) of the month' };
+      const beforeLastMatch = upperPart.match(/^L-(\d{1,2})$/);
+      if (beforeLastMatch) {
+        const daysBefore = Number(beforeLastMatch[1]);
+        if (daysBefore > 30) throw new Error(`Day of month: L-${daysBefore} is too far back. The largest is L-30.`);
+        return { kind: 'special', specialType: 'lastDay', daysBefore, text: `the ${ordinal(daysBefore)} day before the last day of the month` };
+      }
+      const nearestMatch = upperPart.match(/^(\d{1,2})W$/);
+      if (nearestMatch) {
+        const targetDay = readFieldNumber(nearestMatch[1], fieldName, 'quartz');
+        return { kind: 'special', specialType: 'nearestWeekday', targetDay, text: `the weekday (Monday to Friday) nearest the ${ordinal(targetDay)} of the month` };
+      }
+    }
+
+    if (fieldName === 'dayOfWeek') {
+      if (upperPart === 'L') return { kind: 'range', from: 7, to: 7, step: 1, isSingle: true };
+      const lastWeekdayMatch = upperPart.match(/^(\w+)L$/);
+      if (lastWeekdayMatch) {
+        const weekdayIndex = normaliseWeekday(readFieldNumber(lastWeekdayMatch[1], fieldName, 'quartz'), 'quartz');
+        return { kind: 'special', specialType: 'lastWeekdayOfMonth', weekdayIndex, text: `the last ${DAY_NAMES[weekdayIndex]} of the month` };
+      }
+      const nthMatch = upperPart.match(/^(\w+)#(\d+)$/);
+      if (nthMatch) {
+        const weekdayIndex = normaliseWeekday(readFieldNumber(nthMatch[1], fieldName, 'quartz'), 'quartz');
+        const weekNumber = Number(nthMatch[2]);
+        if (weekNumber < 1 || weekNumber > 5) throw new Error(`Day of week: #${weekNumber} is outside #1 to #5.`);
+        return { kind: 'special', specialType: 'nthWeekdayOfMonth', weekdayIndex, weekNumber, text: `the ${ordinal(weekNumber)} ${DAY_NAMES[weekdayIndex]} of the month` };
+      }
+    }
+    return null;
+  }
+
+  // Read one comma-separated part: a star, 5, 1-5, a star with a step, 1-30/5, 5/15, or a Quartz special.
+  function readFieldPart(partText, fieldName, dialectName) {
+    const fieldLabel = FIELD_SPECS[fieldName].label;
+    const { smallest, largest } = fieldLimits(fieldName, dialectName);
+
+    if (dialectName === 'quartz') {
+      const specialItem = readQuartzSpecialItem(partText, fieldName);
+      if (specialItem) return specialItem;
+    }
+
+    const stepPieces = partText.split('/');
+    if (stepPieces.length > 2) throw new Error(`${fieldLabel}: "${partText}" has more than one /.`);
+    const hasStep = stepPieces.length === 2;
+    if (hasStep && !/^\d+$/.test(stepPieces[1])) throw new Error(`${fieldLabel}: the step in "${partText}" must be a whole number.`);
+    const stepSize = hasStep ? Number(stepPieces[1]) : 1;
+    if (stepSize < 1) throw new Error(`${fieldLabel}: the step in "${partText}" must be at least 1.`);
+
+    const baseText = stepPieces[0];
+    if (baseText === '*') {
+      // 7 is a second name for Sunday in Unix, so "every day" stops at 6.
+      const lastValue = fieldName === 'dayOfWeek' && dialectName !== 'quartz' ? 6 : largest;
+      return { kind: 'all', from: smallest, to: lastValue, step: stepSize };
+    }
+
+    const rangePieces = baseText.split('-');
+    if (rangePieces.length > 2) throw new Error(`${fieldLabel}: "${baseText}" is not a range.`);
+    const fromNumber = readFieldNumber(rangePieces[0], fieldName, dialectName);
+
+    if (rangePieces.length === 2) {
+      const toNumber = readFieldNumber(rangePieces[1], fieldName, dialectName);
+      if (fromNumber > toNumber && dialectName !== 'quartz') {
+        throw new Error(`${fieldLabel}: the range ${baseText} runs backwards.`);
+      }
+      return { kind: 'range', from: fromNumber, to: toNumber, step: stepSize };
+    }
+    if (hasStep) return { kind: 'range', from: fromNumber, to: largest, step: stepSize, runsToEnd: true };
+    return { kind: 'range', from: fromNumber, to: fromNumber, step: 1, isSingle: true };
+  }
+
+  /** The numbers a range item covers. Quartz ranges may wrap past the end (22-2). */
+  function expandItem(fieldItem, fieldName, dialectName) {
+    const { smallest, largest } = fieldLimits(fieldName, dialectName);
+    const coveredNumbers = [];
+    if (fieldItem.from <= fieldItem.to) {
+      for (let number = fieldItem.from; number <= fieldItem.to; number += fieldItem.step) coveredNumbers.push(number);
+    } else {
+      const fieldWidth = largest - smallest + 1;
+      const rangeWidth = fieldItem.to + fieldWidth - fieldItem.from;
+      for (let distance = 0; distance <= rangeWidth; distance += fieldItem.step) {
+        coveredNumbers.push(((fieldItem.from - smallest + distance) % fieldWidth) + smallest);
+      }
+    }
+    return coveredNumbers;
+  }
+
+  /** Read one whole field into its items and the set of values it covers. */
+  function parseField(fieldText, fieldName, dialectName) {
+    const fieldLabel = FIELD_SPECS[fieldName].label;
+    const dayFields = ['dayOfMonth', 'dayOfWeek'];
+
+    if (fieldText === '?') {
+      if (dialectName !== 'quartz' || !dayFields.includes(fieldName)) {
+        throw new Error(`${fieldLabel}: ? only works in the Quartz day fields.`);
+      }
+      return { fieldName, text: fieldText, isNoValue: true, isStar: false, items: [], values: new Set() };
+    }
+
+    if (dialectName !== 'quartz' && /[LW#]/i.test(fieldText) && !/[a-z]{3}/i.test(fieldText)) {
+      throw new Error(`${fieldLabel}: L, W and # only work in Quartz. Pick Quartz above to use them.`);
+    }
+
+    const fieldItems = fieldText.split(',').map((partText) => {
+      if (partText === '') throw new Error(`${fieldLabel}: there is an empty value in "${fieldText}".`);
+      return readFieldPart(partText, fieldName, dialectName);
+    });
+
+    const coveredValues = new Set();
+    fieldItems.filter((fieldItem) => fieldItem.kind !== 'special').forEach((fieldItem) => {
+      expandItem(fieldItem, fieldName, dialectName).forEach((number) => {
+        coveredValues.add(fieldName === 'dayOfWeek' ? normaliseWeekday(number, dialectName) : number);
+      });
+    });
+
+    return { fieldName, text: fieldText, isNoValue: false, isStar: fieldText.startsWith('*'), items: fieldItems, values: coveredValues };
+  }
+
+  /** Read a whole expression. Throws an Error with a readable message. */
+  function parseExpression(expressionText, dialectName) {
+    let cleanExpression = expressionText.trim().replace(/\s+/g, ' ');
+    const dialect = DIALECTS[dialectName];
+
+    if (cleanExpression.startsWith('@')) {
+      const lowerMacro = cleanExpression.toLowerCase();
+      if (lowerMacro === '@reboot') return { isReboot: true, dialectName };
+      if (dialectName !== 'unix') throw new Error('Names like @daily only work in Unix. Pick Unix above to use them.');
+      if (!SCHEDULE_MACROS[lowerMacro]) {
+        throw new Error(`"${cleanExpression}" is not a known name. Try ${Object.keys(SCHEDULE_MACROS).join(', ')} or @reboot.`);
+      }
+      cleanExpression = SCHEDULE_MACROS[lowerMacro];
+    }
+
+    const fieldTexts = cleanExpression.split(' ');
+    const requiredCount = dialect.optionalLastField ? dialect.fieldNames.length - 1 : dialect.fieldNames.length;
+    if (fieldTexts.length < requiredCount || fieldTexts.length > dialect.fieldNames.length) {
+      const expectedText = dialect.optionalLastField ? `${requiredCount} or ${dialect.fieldNames.length}` : String(requiredCount);
+      throw new Error(`This dialect needs ${expectedText} fields, and this expression has ${fieldTexts.length}. Is another dialect above the right one?`);
+    }
+
+    const parsedFields = {};
+    fieldTexts.forEach((fieldText, fieldIndex) => {
+      const fieldName = dialect.fieldNames[fieldIndex];
+      parsedFields[fieldName] = parseField(fieldText, fieldName, dialectName);
+    });
+
+    if (dialectName === 'quartz') {
+      const dayOfMonthUnset = parsedFields.dayOfMonth.isNoValue;
+      const dayOfWeekUnset = parsedFields.dayOfWeek.isNoValue;
+      if (dayOfMonthUnset === dayOfWeekUnset) {
+        throw new Error('Quartz needs a ? in exactly one of the two day fields, such as 0 0 12 * * ? or 0 0 12 ? * MON.');
+      }
+    }
+    return { isReboot: false, dialectName, fieldNames: fieldTexts.map((fieldText, fieldIndex) => dialect.fieldNames[fieldIndex]), fields: parsedFields };
+  }
+
+  /* ---------- Plain English ---------- */
+
+  /** How one number in a field reads. */
+  function formatFieldNumber(fieldNumber, fieldName, dialectName) {
+    if (fieldName === 'month') return MONTH_NAMES[fieldNumber - 1];
+    if (fieldName === 'dayOfWeek') return DAY_NAMES[normaliseWeekday(fieldNumber, dialectName)];
+    if (fieldName === 'dayOfMonth') return ordinal(fieldNumber);
+    return String(fieldNumber);
+  }
+
+  /** One item of a field in words. */
+  function describeItem(fieldItem, fieldName, dialectName) {
+    const unitName = FIELD_SPECS[fieldName].unit;
+    const writeNumber = (fieldNumber) => formatFieldNumber(fieldNumber, fieldName, dialectName);
+
+    if (fieldItem.kind === 'special') return fieldItem.text;
+    if (fieldItem.kind === 'all') {
+      return fieldItem.step === 1 ? `every ${unitName}` : `every ${fieldItem.step} ${unitName}s`;
+    }
+    if (fieldItem.isSingle) return writeNumber(fieldItem.from);
+    if (fieldItem.runsToEnd) return `every ${fieldItem.step} ${unitName}s starting at ${writeNumber(fieldItem.from)}`;
+    if (fieldItem.step === 1) return `${writeNumber(fieldItem.from)} through ${writeNumber(fieldItem.to)}`;
+    return `every ${fieldItem.step} ${unitName}s from ${writeNumber(fieldItem.from)} through ${writeNumber(fieldItem.to)}`;
+  }
+
+  /** A whole field in words. */
+  function describeField(parsedField, dialectName) {
+    if (parsedField.isNoValue) return 'no specific value, the other day field decides';
+    return joinWithAnd(parsedField.items.map((fieldItem) => describeItem(fieldItem, parsedField.fieldName, dialectName)));
+  }
+
+  const isEveryValue = (parsedField) => parsedField.items.length === 1 && parsedField.items[0].kind === 'all' && parsedField.items[0].step === 1;
+  const isEveryStep = (parsedField) => parsedField.items.length === 1 && parsedField.items[0].kind === 'all' && parsedField.items[0].step > 1;
+  const isOnlySingles = (parsedField) => parsedField.items.every((fieldItem) => fieldItem.isSingle);
+  const sortedValues = (parsedField) => [...parsedField.values].sort((first, second) => first - second);
+
+  /** A field that the schedule does not limit: *, or the ? that Quartz uses. */
+  const isUnrestricted = (parsedField) => parsedField.isNoValue || isEveryValue(parsedField);
+
+  /** The hour and minute part of the sentence, such as "At 09:00" or "Every 5 minutes". */
+  function describeTime(secondField, minuteField, hourField, dialectName) {
+    const secondIsZero = !secondField || (isOnlySingles(secondField) && secondField.values.size === 1 && secondField.values.has(0));
+    const secondIsSingle = !secondField || (isOnlySingles(secondField) && secondField.values.size === 1);
+    const singleSecond = secondField && secondIsSingle ? sortedValues(secondField)[0] : 0;
+    const clockTime = (hourNumber, minuteNumber) => `${padTwo(hourNumber)}:${padTwo(minuteNumber)}${singleSecond ? ':' + padTwo(singleSecond) : ''}`;
+
+    // Fixed times, as long as there are few enough to list.
+    if (secondIsSingle && isOnlySingles(minuteField) && isOnlySingles(hourField)) {
+      const clockTimes = [];
+      sortedValues(hourField).forEach((hourNumber) => {
+        sortedValues(minuteField).forEach((minuteNumber) => clockTimes.push(clockTime(hourNumber, minuteNumber)));
+      });
+      if (clockTimes.length <= 8) return `At ${joinWithAnd(clockTimes)}`;
+    }
+
+    const describeHours = () => {
+      if (isEveryValue(hourField)) return '';
+      if (isEveryStep(hourField)) return `in every ${ordinal(hourField.items[0].step)} hour`;
+      if (hourField.items.length === 1 && hourField.items[0].kind === 'range' && hourField.items[0].step === 1) {
+        const onlyItem = hourField.items[0];
+        if (onlyItem.from <= onlyItem.to) return `between ${padTwo(onlyItem.from)}:00 and ${padTwo(onlyItem.to)}:59`;
+      }
+      return `during hours ${describeField(hourField, dialectName)}`;
+    };
+
+    const timeParts = [];
+    if (!secondIsZero) {
+      const everyMinuteText = isEveryValue(minuteField) ? ' of every minute' : '';
+      timeParts.push(isOnlySingles(secondField) ? `at second ${describeField(secondField, dialectName)}${everyMinuteText}` : describeField(secondField, dialectName));
+    }
+
+    const singleMinute = isOnlySingles(minuteField) && minuteField.values.size === 1 ? sortedValues(minuteField)[0] : null;
+    if (singleMinute !== null && secondIsSingle && hourField.items.length === 1 && hourField.items[0].kind !== 'special') {
+      const onlyItem = hourField.items[0];
+      const hourStepText = onlyItem.step === 1 ? 'Every hour' : `Every ${onlyItem.step} hours`;
+      const everyWholeDay = onlyItem.kind === 'all';
+      if (everyWholeDay) {
+        if (singleMinute === 0) return `${hourStepText}, on the hour`;
+        return `${hourStepText}, at ${singleMinute} ${singleMinute === 1 ? 'minute' : 'minutes'} past`;
+      }
+      if (onlyItem.from <= onlyItem.to) {
+        const lastCoveredHour = sortedValues(hourField)[hourField.values.size - 1];
+        return `${hourStepText} from ${clockTime(onlyItem.from, singleMinute)} through ${clockTime(lastCoveredHour, singleMinute)}`;
+      }
+    }
+
+    if (!isEveryValue(minuteField) || secondIsZero) {
+      if (isEveryValue(minuteField) || isEveryStep(minuteField)) timeParts.push(describeField(minuteField, dialectName));
+      else timeParts.push(`at minute ${describeField(minuteField, dialectName)}`);
+    }
+
+    const hoursText = describeHours();
+    if (hoursText) timeParts.push(hoursText);
+    return capitalise(timeParts.join(', '));
+  }
+
+  /** The date part of the sentence, or an empty string when it runs every day. */
+  function describeDate(parsedExpression) {
+    const { dialectName, fields } = parsedExpression;
+    const dayOfMonthField = fields.dayOfMonth;
+    const dayOfWeekField = fields.dayOfWeek;
+    const monthField = fields.month;
+    const yearField = fields.year;
+
+    const describeDayOfMonth = () => {
+      if (dayOfMonthField.items.every((fieldItem) => fieldItem.kind === 'special')) return `on ${describeField(dayOfMonthField, dialectName)}`;
+      if (isEveryStep(dayOfMonthField)) return `on ${describeField(dayOfMonthField, dialectName)} of the month`;
+      return `on the ${describeField(dayOfMonthField, dialectName)} of the month`;
+    };
+
+    const dayOfMonthLimited = !isUnrestricted(dayOfMonthField);
+    const dayOfWeekLimited = !isUnrestricted(dayOfWeekField);
+    const dateParts = [];
+    let monthIsWritten = false;
+
+    // "on January 1st" reads better than "on the 1st of the month, in January".
+    const singleDayInSingleMonth = dayOfMonthLimited && isOnlySingles(dayOfMonthField) && dayOfMonthField.values.size === 1
+      && isOnlySingles(monthField) && monthField.values.size === 1;
+
+    if (singleDayInSingleMonth) {
+      const monthName = MONTH_NAMES[sortedValues(monthField)[0] - 1];
+      dateParts.push(`on ${monthName} ${ordinal(sortedValues(dayOfMonthField)[0])}`);
+      monthIsWritten = true;
+    } else if (dayOfMonthLimited) {
+      dateParts.push(describeDayOfMonth());
+    }
+
+    if (dayOfWeekLimited) {
+      const weekdayText = `on ${describeField(dayOfWeekField, dialectName)}`;
+      if (dayOfMonthLimited) {
+        // Unix runs on either day when both day fields are limited, unless one starts with *.
+        const joiningWord = dayOfMonthField.isStar || dayOfWeekField.isStar ? 'and' : 'or';
+        dateParts[dateParts.length - 1] += ` ${joiningWord} ${weekdayText}`;
+      } else {
+        dateParts.push(weekdayText);
+      }
+    }
+
+    if (!isEveryValue(monthField) && !monthIsWritten) dateParts.push(`in ${describeField(monthField, dialectName)}`);
+    if (yearField && !isEveryValue(yearField)) dateParts.push(`in ${describeField(yearField, dialectName)}`);
+    return dateParts.join(', ');
+  }
+
+  /** The whole expression as one sentence. */
+  function describeExpression(parsedExpression) {
+    if (parsedExpression.isReboot) return 'Once, every time the system starts.';
+    const { dialectName, fields } = parsedExpression;
+    const timeText = describeTime(fields.second, fields.minute, fields.hour, dialectName);
+    const dateText = describeDate(parsedExpression);
+    return `${timeText}${dateText ? ', ' + dateText : ''}.`;
+  }
+
+  /** A warning for the day rule that surprises most people, or an empty string. */
+  function describeDayRule(parsedExpression) {
+    if (parsedExpression.isReboot || parsedExpression.dialectName === 'quartz') return '';
+    const { dayOfMonth, dayOfWeek } = parsedExpression.fields;
+    if (dayOfMonth.isStar || dayOfWeek.isStar) return '';
+    return 'Both day fields are set, so this runs when either one matches, not only when both do. That is how standard cron works; a few schedulers require both, so check yours.';
+  }
+
+  /* ---------- Finding the next runs ---------- */
+
+  const zoneFormatters = new Map();
+  const zoneOffsetCache = new Map();
+
+  /** One reusable formatter per zone; creating them is slow. */
+  function zoneFormatter(zoneName) {
+    if (!zoneFormatters.has(zoneName)) {
+      zoneFormatters.set(zoneName, new Intl.DateTimeFormat('en-US', {
+        timeZone: zoneName,
+        hourCycle: 'h23',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }));
+    }
+    return zoneFormatters.get(zoneName);
+  }
+
+  /**
+   * How far this zone is ahead of UTC at a moment, in milliseconds. Clocks only
+   * change on quarter hours, so one answer per quarter hour is enough. That
+   * cache keeps schedules that run every second fast.
+   */
+  function zoneOffsetAt(utcMilliseconds, zoneName) {
+    const stepStart = Math.floor(utcMilliseconds / OFFSET_CACHE_STEP_MILLISECONDS) * OFFSET_CACHE_STEP_MILLISECONDS;
+    const cacheKey = `${zoneName}|${stepStart}`;
+    if (zoneOffsetCache.has(cacheKey)) return zoneOffsetCache.get(cacheKey);
+
+    const clockParts = {};
+    zoneFormatter(zoneName).formatToParts(new Date(stepStart)).forEach((datePart) => {
+      if (datePart.type !== 'literal') clockParts[datePart.type] = Number(datePart.value);
+    });
+    const wallMilliseconds = Date.UTC(clockParts.year, clockParts.month - 1, clockParts.day, clockParts.hour, clockParts.minute, clockParts.second);
+    const zoneOffset = wallMilliseconds - stepStart;
+    zoneOffsetCache.set(cacheKey, zoneOffset);
+    return zoneOffset;
+  }
+
+  /**
+   * Turn a wall clock time in a zone into a moment. Returns null for a time the
+   * clocks skip, and the first moment for a time that happens twice.
+   */
+  function wallClockToUtc(wallMilliseconds, zoneName) {
+    const offsetBefore = zoneOffsetAt(wallMilliseconds - MILLISECONDS_PER_DAY, zoneName);
+    const offsetAfter = zoneOffsetAt(wallMilliseconds + MILLISECONDS_PER_DAY, zoneName);
+    const possibleMoments = [wallMilliseconds - offsetBefore, wallMilliseconds - offsetAfter]
+      .filter((candidateMoment) => candidateMoment + zoneOffsetAt(candidateMoment, zoneName) === wallMilliseconds);
+    return possibleMoments.length ? Math.min(...possibleMoments) : null;
+  }
+
+  /** The number of days in a month. month is 1 to 12. */
+  function daysInMonth(year, month) {
+    return new Date(Date.UTC(year, month, 0)).getUTCDate();
+  }
+
+  /** Weekday of a date, with 0 as Sunday. */
+  function weekdayOf(year, month, day) {
+    return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  }
+
+  /** The Monday-to-Friday day closest to a target day, staying inside the month. */
+  function nearestWeekdayDay(year, month, targetDay) {
+    const lastDay = daysInMonth(year, month);
+    const usedDay = Math.min(targetDay, lastDay);
+    const weekday = weekdayOf(year, month, usedDay);
+    if (weekday === 6) return usedDay > 1 ? usedDay - 1 : usedDay + 2;
+    if (weekday === 0) return usedDay < lastDay ? usedDay + 1 : usedDay - 2;
+    return usedDay;
+  }
+
+  /** The last Monday-to-Friday day of a month. */
+  function lastWeekdayDay(year, month) {
+    const lastDay = daysInMonth(year, month);
+    const weekday = weekdayOf(year, month, lastDay);
+    if (weekday === 6) return lastDay - 1;
+    if (weekday === 0) return lastDay - 2;
+    return lastDay;
+  }
+
+  function dayOfMonthMatches(parsedField, year, month, day) {
+    if (parsedField.isNoValue) return true;
+    if (parsedField.values.has(day)) return true;
+    return parsedField.items.some((fieldItem) => {
+      if (fieldItem.specialType === 'lastDay') return day === daysInMonth(year, month) - fieldItem.daysBefore;
+      if (fieldItem.specialType === 'lastWeekday') return day === lastWeekdayDay(year, month);
+      if (fieldItem.specialType === 'nearestWeekday') return day === nearestWeekdayDay(year, month, fieldItem.targetDay);
+      return false;
+    });
+  }
+
+  function dayOfWeekMatches(parsedField, year, month, day) {
+    if (parsedField.isNoValue) return true;
+    const weekday = weekdayOf(year, month, day);
+    if (parsedField.values.has(weekday)) return true;
+    return parsedField.items.some((fieldItem) => {
+      if (fieldItem.specialType === 'lastWeekdayOfMonth') return weekday === fieldItem.weekdayIndex && day + 7 > daysInMonth(year, month);
+      if (fieldItem.specialType === 'nthWeekdayOfMonth') return weekday === fieldItem.weekdayIndex && Math.ceil(day / 7) === fieldItem.weekNumber;
+      return false;
+    });
+  }
+
+  /** True when the schedule runs on this date. */
+  function dateMatches(parsedExpression, year, month, day) {
+    const { fields, dialectName } = parsedExpression;
+    if (!fields.month.values.has(month)) return false;
+    if (fields.year && !fields.year.values.has(year)) return false;
+
+    const dayOfMonthHit = dayOfMonthMatches(fields.dayOfMonth, year, month, day);
+    const dayOfWeekHit = dayOfWeekMatches(fields.dayOfWeek, year, month, day);
+    if (dialectName === 'quartz') return dayOfMonthHit && dayOfWeekHit;
+
+    // Standard cron: when neither day field starts with *, either one is enough.
+    if (fields.dayOfMonth.isStar || fields.dayOfWeek.isStar) return dayOfMonthHit && dayOfWeekHit;
+    return dayOfMonthHit || dayOfWeekHit;
+  }
+
+  /** The next runs after a moment, walking the zone's wall clock one day at a time. */
+  function findNextRuns(parsedExpression, afterMilliseconds, zoneName, runCount) {
+    const { fields } = parsedExpression;
+    const hourList = sortedValues(fields.hour);
+    const minuteList = sortedValues(fields.minute);
+    const secondList = fields.second ? sortedValues(fields.second) : [0];
+
+    const startWall = afterMilliseconds + zoneOffsetAt(afterMilliseconds, zoneName);
+    const firstDayStart = Math.floor(startWall / MILLISECONDS_PER_DAY) * MILLISECONDS_PER_DAY;
+    const foundRuns = [];
+
+    for (let dayIndex = 0; dayIndex < SEARCH_DAYS; dayIndex++) {
+      const dayStart = firstDayStart + dayIndex * MILLISECONDS_PER_DAY;
+      const dayDate = new Date(dayStart);
+      if (!dateMatches(parsedExpression, dayDate.getUTCFullYear(), dayDate.getUTCMonth() + 1, dayDate.getUTCDate())) continue;
+
+      for (const hourNumber of hourList) {
+        // Whole hours clearly in the past are skipped without looking at the minutes.
+        if (dayStart + (hourNumber + 3) * MILLISECONDS_PER_HOUR < startWall) continue;
+        for (const minuteNumber of minuteList) {
+          for (const secondNumber of secondList) {
+            const wallMilliseconds = dayStart + (hourNumber * 3600 + minuteNumber * 60 + secondNumber) * MILLISECONDS_PER_SECOND;
+            const runMoment = wallClockToUtc(wallMilliseconds, zoneName);
+            if (runMoment === null || runMoment <= afterMilliseconds) continue;
+            foundRuns.push(runMoment);
+            if (foundRuns.length >= runCount) return foundRuns;
+          }
+        }
+      }
+    }
+    return foundRuns;
+  }
+
+  /* ---------- Drawing the page ---------- */
+
+  function selectedDialect() {
+    return [...dialectRadios].find((dialectRadio) => dialectRadio.checked).value;
+  }
+
+  /** The limits of a field in words, for the table. */
+  function describeLimits(fieldName, dialectName) {
+    const { smallest, largest } = fieldLimits(fieldName, dialectName);
+    const namedText = { month: ', JAN-DEC', dayOfWeek: ', SUN-SAT' }[fieldName] ?? '';
+    return `${smallest}-${largest}${namedText}`;
+  }
+
+  /** One table row built from plain cell texts. mono marks the columns in the code font. */
+  function buildTableRow(cellTexts, monoColumns = []) {
+    const tableRow = document.createElement('tr');
+    cellTexts.forEach((cellText, columnIndex) => {
+      const tableCell = document.createElement('td');
+      tableCell.textContent = cellText;
+      if (monoColumns.includes(columnIndex)) tableCell.className = 'mono';
+      tableRow.appendChild(tableCell);
+    });
+    return tableRow;
+  }
+
+  function renderFieldTable(parsedExpression) {
+    fieldTableBody.replaceChildren();
+    parsedExpression.fieldNames.forEach((fieldName) => {
+      const parsedField = parsedExpression.fields[fieldName];
+      fieldTableBody.appendChild(buildTableRow([
+        FIELD_SPECS[fieldName].label,
+        parsedField.text,
+        capitalise(describeField(parsedField, parsedExpression.dialectName)),
+        describeLimits(fieldName, parsedExpression.dialectName),
+      ], [1, 3]));
+    });
+  }
+
+  /** Time from now, such as "in 3 days". */
+  function formatRelative(utcMilliseconds) {
+    const relativeFormatter = new Intl.RelativeTimeFormat('en', { numeric: 'always' });
+    const differenceSeconds = (utcMilliseconds - Date.now()) / 1000;
+    const unitSizes = [
+      ['year', 31557600], ['month', 2629800], ['day', 86400],
+      ['hour', 3600], ['minute', 60], ['second', 1],
+    ];
+    const [unitName, unitSeconds] = unitSizes.find(([, sizeSeconds]) => Math.abs(differenceSeconds) >= sizeSeconds) ?? unitSizes[5];
+    return relativeFormatter.format(Math.trunc(differenceSeconds / unitSeconds), unitName);
+  }
+
+  /** One run as [time, weekday, from now] in the picked zone. */
+  function buildRunRow(runMoment, zoneName) {
+    const wallDate = new Date(runMoment + zoneOffsetAt(runMoment, zoneName));
+    const isoText = wallDate.toISOString();
+    return [`${isoText.slice(0, 10)} ${isoText.slice(11, 19)}`, DAY_NAMES[wallDate.getUTCDay()], formatRelative(runMoment)];
+  }
+
+  function renderRuns(parsedExpression) {
+    const zoneName = zoneSelect.value;
+    const hasSchedule = !parsedExpression.isReboot;
+    const foundRuns = hasSchedule
+      ? findNextRuns(parsedExpression, Date.now(), zoneName, Number(runCountSelect.value))
+      : [];
+
+    currentRunRows = foundRuns.map((runMoment) => buildRunRow(runMoment, zoneName));
+    runsTableBody.replaceChildren(...currentRunRows.map((runRow) => buildTableRow(runRow, [0])));
+    runsTableWrap.hidden = foundRuns.length === 0;
+    copyRunsButton.disabled = foundRuns.length === 0;
+
+    noRunsMessage.hidden = foundRuns.length > 0;
+    noRunsMessage.textContent = hasSchedule
+      ? `No runs in the next ${SEARCH_YEARS} years. Check that the date can happen, for example February 30.`
+      : 'This runs when the system starts, so it has no clock times.';
+  }
+
+  /** Re-read the expression and redraw. */
+  function refresh() {
+    const dialectName = selectedDialect();
+    fieldOrderHint.textContent = DIALECTS[dialectName].hint;
+    pageLinkOutput.value = buildPageLink();
+    explanationCopyStatus.textContent = '';
+    linkCopyStatus.textContent = '';
+    runsCopyStatus.textContent = '';
+
+    let parsedExpression = null;
+    let messageText = '';
+    if (expressionInput.value.trim() === '') {
+      messageText = 'Type a cron expression above.';
+    } else {
+      try {
+        parsedExpression = parseExpression(expressionInput.value, dialectName);
+      } catch (parseError) {
+        messageText = parseError.message;
+      }
+    }
+
+    expressionMessage.textContent = messageText;
+    expressionMessage.hidden = !messageText;
+    expressionInput.classList.toggle('invalid', Boolean(messageText) && expressionInput.value.trim() !== '');
+
+    const isReadable = parsedExpression !== null;
+    explanationOutput.hidden = !isReadable;
+    copyExplanationButton.parentElement.hidden = !isReadable;
+    runsSection.hidden = !isReadable;
+    fieldsSection.hidden = !isReadable || parsedExpression.isReboot;
+    dayRuleMessage.hidden = true;
+    if (!isReadable) return;
+
+    explanationOutput.textContent = describeExpression(parsedExpression);
+    const dayRuleText = describeDayRule(parsedExpression);
+    dayRuleMessage.textContent = dayRuleText;
+    dayRuleMessage.hidden = !dayRuleText;
+    if (!parsedExpression.isReboot) renderFieldTable(parsedExpression);
+    renderRuns(parsedExpression);
+  }
+
+  /** Fill the zone list: every zone the browser knows, with UTC first. */
+  function fillZoneSelect() {
+    const knownZones = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
+    [...new Set(['UTC', browserZone, ...knownZones])].forEach((zoneName) => {
+      const zoneOption = document.createElement('option');
+      zoneOption.value = zoneName;
+      zoneOption.textContent = zoneName;
+      zoneSelect.appendChild(zoneOption);
+    });
+    zoneSelect.value = browserZone;
+  }
+
+  /** Fill the Examples list. The first row only prompts for a choice. */
+  function fillExampleSelect() {
+    const promptOption = document.createElement('option');
+    promptOption.value = '';
+    promptOption.textContent = 'Pick an example…';
+    exampleSelect.appendChild(promptOption);
+    EXAMPLES.forEach(([exampleLabel, , exampleExpression], exampleIndex) => {
+      const exampleOption = document.createElement('option');
+      exampleOption.value = String(exampleIndex);
+      exampleOption.textContent = `${exampleLabel}: ${exampleExpression}`;
+      exampleSelect.appendChild(exampleOption);
+    });
+  }
+
+  /* ---------- Clipboard ---------- */
+
+  /** Put text on the clipboard, with the older copy command as a fallback. */
+  async function writeToClipboard(plainText) {
+    try {
+      await navigator.clipboard.writeText(plainText);
+      return true;
+    } catch (clipboardError) {
+      const fillClipboard = (copyEvent) => {
+        copyEvent.clipboardData.setData('text/plain', plainText);
+        copyEvent.preventDefault();
+      };
+      document.addEventListener('copy', fillClipboard, { once: true });
+      const copySucceeded = document.execCommand('copy');
+      document.removeEventListener('copy', fillClipboard);
+      return copySucceeded;
+    }
+  }
+
+  /* ---------- Link with the expression filled in ---------- */
+
+  /**
+   * Encode only the characters that would break the query string (% & = # +)
+   * and line breaks. Spaces stay as plain spaces so the link is readable.
+   */
+  function encodeQueryPart(rawText) {
+    return rawText
+      .replace(/%/g, '%25').replace(/&/g, '%26').replace(/=/g, '%3D')
+      .replace(/#/g, '%23').replace(/\+/g, '%2B')
+      .replace(/\r?\n/g, '%0A').replace(/\t/g, '%09');
+  }
+
+  function buildPageLink() {
+    const pageAddress = window.location.href.split(/[?#]/)[0];
+    const queryParts = [`cron=${encodeQueryPart(expressionInput.value.trim())}`];
+    if (selectedDialect() !== 'unix') queryParts.push(`dialect=${selectedDialect()}`);
+    queryParts.push(`zone=${encodeQueryPart(zoneSelect.value)}`);
+    return `${pageAddress}?${queryParts.join('&')}`;
+  }
+
+  /** Read one ?name=... from the address. Plain spaces, + and %20 all mean a space. */
+  function readQueryParameter(parameterName) {
+    const parameterMatch = window.location.search.match(new RegExp(`[?&]${parameterName}=([^&]*)`));
+    if (!parameterMatch) return null;
+    const withSpaces = parameterMatch[1].replace(/\+/g, ' ');
+    try { return decodeURIComponent(withSpaces); } catch (decodeError) { return withSpaces; }
+  }
+
+  function selectDialect(dialectName) {
+    const matchingRadio = [...dialectRadios].find((dialectRadio) => dialectRadio.value === dialectName);
+    if (matchingRadio) matchingRadio.checked = true;
+  }
+
+  /* ---------- Events ---------- */
+
+  expressionInput.addEventListener('input', refresh);
+  zoneSelect.addEventListener('change', refresh);
+  runCountSelect.addEventListener('change', refresh);
+  dialectRadios.forEach((dialectRadio) => dialectRadio.addEventListener('change', refresh));
+
+  // An example fills both the expression and its dialect, then the list resets.
+  exampleSelect.addEventListener('change', () => {
+    if (exampleSelect.value === '') return;
+    const [, exampleDialect, exampleExpression] = EXAMPLES[Number(exampleSelect.value)];
+    selectDialect(exampleDialect);
+    expressionInput.value = exampleExpression;
+    exampleSelect.value = '';
+    refresh();
+  });
+
+  copyExplanationButton.addEventListener('click', async () => {
+    const copySucceeded = await writeToClipboard(explanationOutput.textContent);
+    explanationCopyStatus.textContent = copySucceeded ? 'Copied' : 'Your browser blocked the clipboard.';
+  });
+
+  copyRunsButton.addEventListener('click', async () => {
+    const runLines = currentRunRows.map(([timeText, weekdayName]) => `${timeText} ${weekdayName}`);
+    const copySucceeded = await writeToClipboard(runLines.join('\n'));
+    runsCopyStatus.textContent = copySucceeded ? 'Copied' : 'Your browser blocked the clipboard.';
+  });
+
+  copyLinkButton.addEventListener('click', async () => {
+    const copySucceeded = await writeToClipboard(pageLinkOutput.value);
+    if (!copySucceeded) pageLinkOutput.select();
+    linkCopyStatus.textContent = copySucceeded ? 'Copied' : 'Selected. Press Ctrl+C to copy.';
+  });
+
+  /* ---------- Start ---------- */
+
+  fillZoneSelect();
+  fillExampleSelect();
+
+  selectDialect(readQueryParameter('dialect'));
+  const zoneFromAddress = readQueryParameter('zone');
+  if (zoneFromAddress && [...zoneSelect.options].some((zoneOption) => zoneOption.value === zoneFromAddress)) {
+    zoneSelect.value = zoneFromAddress;
+  }
+  expressionInput.value = readQueryParameter('cron') ?? '*/15 8-17 * * 1-5';
+  refresh();
+</script>
+</body>
+</html>

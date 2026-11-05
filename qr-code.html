@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR code generator</title>
+<style>
+  /* Same colour scheme and layout as flag-decoder.html. */
+  :root {
+    --page-background: #f3f5f8;
+    --panel-background: #ffffff;
+    --text-color: #1b2230;
+    --muted-text-color: #5b6477;
+    --border-color: #d6dbe4;
+    --accent-color: #2457d6;
+    --accent-text-color: #ffffff;
+    --warning-background: #fff3d6;
+    --warning-text-color: #6b4a00;
+    --body-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono-font: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page-background: #13161c;
+      --panel-background: #1c2028;
+      --text-color: #e5e8ee;
+      --muted-text-color: #98a1b3;
+      --border-color: #323947;
+      --accent-color: #7ea1ff;
+      --accent-text-color: #0f1420;
+      --warning-background: #3a3018;
+      --warning-text-color: #f1d48a;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page-background: #13161c;
+    --panel-background: #1c2028;
+    --text-color: #e5e8ee;
+    --muted-text-color: #98a1b3;
+    --border-color: #323947;
+    --accent-color: #7ea1ff;
+    --accent-text-color: #0f1420;
+    --warning-background: #3a3018;
+    --warning-text-color: #f1d48a;
+    color-scheme: dark;
+  }
+
+  /* Sections and grids set their own display, which would otherwise beat the hidden attribute. */
+  [hidden] { display: none !important; }
+
+  body {
+    margin: 0;
+    background: var(--page-background);
+    color: var(--text-color);
+    font-family: var(--body-font);
+    font-size: 15px;
+  }
+  main {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 24px 16px 40px;
+    display: grid;
+    gap: 18px;
+  }
+  h1 { margin: 0; font-size: 24px; text-wrap: balance; }
+  h2 { margin: 0; font-size: 16px; }
+  .intro { margin: 6px 0 0; color: var(--muted-text-color); max-width: 65ch; }
+
+  section {
+    background: var(--panel-background);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 0;
+    display: grid;
+    gap: 12px;
+  }
+  .section-header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+
+  input[type="text"], input[type="password"], input[type="number"], select, textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background: var(--page-background);
+    color: var(--text-color);
+    font: inherit;
+  }
+  textarea { min-height: 110px; resize: vertical; font-family: var(--mono-font); font-size: 13px; }
+  input[type="color"] { width: 56px; height: 34px; padding: 2px; border: 1px solid var(--border-color); border-radius: 5px; background: var(--page-background); cursor: pointer; }
+  input:focus-visible, button:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 1px; }
+
+  button {
+    padding: 8px 14px;
+    border: 1px solid var(--accent-color);
+    border-radius: 5px;
+    background: var(--accent-color);
+    color: var(--accent-text-color);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--accent-color); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .muted { color: var(--muted-text-color); font-variant-numeric: tabular-nums; }
+  .small { font-size: 13px; }
+  .option-row { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: end; }
+  .field-label { display: grid; gap: 4px; min-width: 0; }
+  .option-name { font-size: 13px; color: var(--muted-text-color); }
+  .wifi-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+
+  /* Choices drawn as a row of segmented buttons. */
+  .format-choice { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--border-color); border-radius: 5px; overflow: hidden; width: fit-content; }
+  .format-choice label { padding: 7px 14px; cursor: pointer; border-right: 1px solid var(--border-color); }
+  .format-choice label:last-child { border-right: none; }
+  .format-choice input { position: absolute; opacity: 0; pointer-events: none; }
+  .format-choice label:has(input:checked) { background: var(--accent-color); color: var(--accent-text-color); font-weight: 600; }
+  .format-choice label:has(input:focus-visible) { outline: 2px solid var(--accent-color); outline-offset: -2px; }
+
+  .warning-message { background: var(--warning-background); color: var(--warning-text-color); border-radius: 5px; padding: 8px 10px; margin: 0; }
+
+  .code-area { display: grid; justify-items: center; gap: 12px; }
+  /* Keep the modules sharp when the browser scales the image to fit. */
+  #qrCanvas { max-width: min(100%, 420px); height: auto; image-rendering: pixelated; border-radius: 4px; }
+
+  .value-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin: 0; width: 100%; }
+  .value-summary div { border: 1px solid var(--border-color); border-radius: 5px; padding: 8px 10px; min-width: 0; }
+  .value-summary dt { font-size: 12px; color: var(--muted-text-color); }
+  .value-summary dd { margin: 2px 0 0; font-family: var(--mono-font); font-size: 14px; overflow-wrap: anywhere; }
+
+  /* Phones: 16px inputs stop iOS from zooming in on focus. */
+  @media (max-width: 640px) {
+    input[type="text"], input[type="password"], input[type="number"], select, textarea { font-size: 16px; }
+    .actions button { flex: 1 1 auto; }
+    .actions span:empty { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>QR code generator</h1>
+    <p class="intro">Type some text or a link, or fill in Wi-Fi details, and get a QR code to save or copy. The code is built in this page and nothing is sent anywhere.</p>
+  </header>
+
+  <!-- What the code should hold -->
+  <section aria-labelledby="contentHeading">
+    <div class="section-header">
+      <h2 id="contentHeading">Content</h2>
+      <div class="format-choice" role="radiogroup" aria-label="Content type">
+        <label><input type="radio" name="contentType" value="text" checked> Text or link</label>
+        <label><input type="radio" name="contentType" value="wifi"> Wi-Fi</label>
+      </div>
+    </div>
+    <div id="textFields">
+      <textarea id="textInput" spellcheck="false" aria-label="Text or link to put in the QR code"></textarea>
+    </div>
+    <div id="wifiFields" class="wifi-fields" hidden>
+      <label class="field-label">Network name
+        <input type="text" id="wifiNameInput" autocomplete="off" spellcheck="false">
+      </label>
+      <label class="field-label">Password
+        <input type="password" id="wifiPasswordInput" autocomplete="off" spellcheck="false">
+      </label>
+      <label class="field-label">Security
+        <select id="wifiSecuritySelect">
+          <option value="WPA" selected>WPA / WPA2 / WPA3</option>
+          <option value="WEP">WEP</option>
+          <option value="nopass">None</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="wifiHiddenCheckbox"> Hidden network</label>
+    </div>
+  </section>
+
+  <!-- How the code should look -->
+  <section aria-labelledby="optionsHeading">
+    <h2 id="optionsHeading">Options</h2>
+    <div class="option-row">
+      <div class="field-label">
+        <span class="option-name">Error correction</span>
+        <div class="format-choice" role="radiogroup" aria-label="Error correction">
+          <label title="Recovers about 7% damage"><input type="radio" name="errorCorrection" value="L"> L</label>
+          <label title="Recovers about 15% damage"><input type="radio" name="errorCorrection" value="M" checked> M</label>
+          <label title="Recovers about 25% damage"><input type="radio" name="errorCorrection" value="Q"> Q</label>
+          <label title="Recovers about 30% damage"><input type="radio" name="errorCorrection" value="H"> H</label>
+        </div>
+      </div>
+      <label class="field-label">
+        <span class="option-name">Pixels per square</span>
+        <input type="number" id="scaleInput" min="1" max="40" value="8" style="width:6em">
+      </label>
+      <label class="field-label">
+        <span class="option-name">Dark squares</span>
+        <input type="color" id="darkColorInput" value="#000000">
+      </label>
+      <label class="field-label">
+        <span class="option-name">Background</span>
+        <input type="color" id="lightColorInput" value="#ffffff">
+      </label>
+    </div>
+    <div class="muted small">Higher error correction keeps the code readable when it is dirty or partly covered, but makes it denser. The white border around the code is part of the standard, so scanners can find it.</div>
+  </section>
+
+  <!-- The code and ways to save it -->
+  <section aria-labelledby="codeHeading">
+    <div class="section-header">
+      <h2 id="codeHeading">QR code</h2>
+      <span class="muted" id="copyStatus" aria-live="polite"></span>
+    </div>
+    <p class="warning-message" id="messageOutput" hidden></p>
+    <div class="code-area" id="codeArea">
+      <canvas id="qrCanvas" role="img" aria-label="Generated QR code"></canvas>
+      <dl class="value-summary">
+        <div><dt>Version</dt><dd id="versionOutput"></dd></div>
+        <div><dt>Size</dt><dd id="sizeOutput"></dd></div>
+        <div><dt>Image</dt><dd id="imageSizeOutput"></dd></div>
+        <div><dt>Encoding</dt><dd id="modeOutput"></dd></div>
+        <div><dt>Space used</dt><dd id="capacityOutput"></dd></div>
+      </dl>
+    </div>
+    <div class="actions" id="saveActions">
+      <button type="button" id="downloadPngButton">Save PNG</button>
+      <button type="button" class="secondary" id="downloadSvgButton">Save SVG</button>
+      <button type="button" class="secondary" id="copyImageButton">Copy image</button>
+      <button type="button" class="secondary" id="copySvgButton">Copy SVG</button>
+    </div>
+  </section>
+
+  <!-- Link that reopens the page with the content filled in -->
+  <section aria-labelledby="linkHeading">
+    <div class="section-header">
+      <h2 id="linkHeading">Link to this code</h2>
+      <div class="actions">
+        <span class="muted" id="linkCopyStatus" aria-live="polite"></span>
+        <button type="button" class="secondary" id="copyLinkButton">Copy link</button>
+      </div>
+    </div>
+    <input type="text" id="pageLinkOutput" readonly spellcheck="false" aria-label="Link to this page with the current content">
+    <div class="muted small" id="linkHint" hidden>The Wi-Fi password is left out of the link, so it does not end up in chats or browser history.</div>
+  </section>
+</main>
+
+<script>
+  /* ---------- QR encoder ---------- */
+
+  // Error-correction codewords per block, per level, indexed by version (index 0 is unused).
+  const ECC_CODEWORDS_PER_BLOCK = {
+    L: [0, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+    M: [0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26, 30, 22, 22, 24, 24, 28, 28, 26, 26, 26, 26, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28],
+    Q: [0, 13, 22, 18, 26, 18, 24, 18, 22, 20, 24, 28, 26, 24, 20, 30, 24, 28, 28, 26, 30, 28, 30, 30, 30, 30, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+    H: [0, 17, 28, 22, 16, 22, 28, 26, 26, 24, 28, 24, 28, 22, 24, 24, 30, 28, 28, 26, 28, 30, 24, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30],
+  };
+
+  // Number of error-correction blocks, per level, indexed by version (index 0 is unused).
+  const ECC_BLOCK_COUNT = {
+    L: [0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25],
+    M: [0, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5, 5, 8, 9, 9, 10, 10, 11, 13, 14, 16, 17, 17, 18, 20, 21, 23, 25, 26, 28, 29, 31, 33, 35, 37, 38, 40, 43, 45, 47, 49],
+    Q: [0, 1, 1, 2, 2, 4, 4, 6, 6, 8, 8, 8, 10, 12, 16, 12, 17, 16, 18, 21, 20, 23, 23, 25, 27, 29, 34, 34, 35, 38, 40, 43, 45, 48, 51, 53, 56, 59, 62, 65, 68],
+    H: [0, 1, 1, 2, 4, 4, 4, 5, 6, 8, 8, 11, 11, 16, 16, 18, 16, 19, 21, 25, 25, 25, 34, 30, 32, 35, 37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 70, 74, 77, 81],
+  };
+
+  // The two format bits that name each error-correction level.
+  const ECC_FORMAT_BITS = { L: 1, M: 0, Q: 3, H: 2 };
+
+  const ALPHANUMERIC_CHARACTERS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:';
+
+  // Four-bit mode marker, and character-count width for versions 1-9, 10-26 and 27-40.
+  const ENCODING_MODES = {
+    numeric: { name: 'Numeric', marker: 0b0001, countBits: [10, 12, 14] },
+    alphanumeric: { name: 'Alphanumeric', marker: 0b0010, countBits: [9, 11, 13] },
+    byte: { name: 'Bytes (UTF-8)', marker: 0b0100, countBits: [8, 16, 16] },
+  };
+
+  const FIRST_VERSION = 1;
+  const LAST_VERSION = 40;
+
+  /** Add the lowest bitCount bits of a number to a bit list, highest bit first. */
+  function appendBits(bitList, numberValue, bitCount) {
+    for (let bitIndex = bitCount - 1; bitIndex >= 0; bitIndex--) bitList.push((numberValue >>> bitIndex) & 1);
+  }
+
+  const getBit = (numberValue, bitIndex) => ((numberValue >>> bitIndex) & 1) !== 0;
+
+  /** Pick the most compact mode that can hold the whole text. */
+  function chooseMode(messageText) {
+    if (/^\d+$/.test(messageText)) return 'numeric';
+    if ([...messageText].every((character) => ALPHANUMERIC_CHARACTERS.includes(character))) return 'alphanumeric';
+    return 'byte';
+  }
+
+  /** The text as data bits, and its length in the unit the mode counts in. */
+  function encodePayload(messageText, modeName) {
+    const payloadBits = [];
+    if (modeName === 'numeric') {
+      // Each group of three digits takes 10 bits; a shorter last group takes 7 or 4.
+      for (let start = 0; start < messageText.length; start += 3) {
+        const digitGroup = messageText.slice(start, start + 3);
+        appendBits(payloadBits, Number(digitGroup), digitGroup.length * 3 + 1);
+      }
+      return { payloadBits, characterCount: messageText.length };
+    }
+    if (modeName === 'alphanumeric') {
+      // Each pair of characters takes 11 bits; a single last character takes 6.
+      for (let start = 0; start < messageText.length; start += 2) {
+        const firstValue = ALPHANUMERIC_CHARACTERS.indexOf(messageText[start]);
+        if (start + 1 < messageText.length) {
+          appendBits(payloadBits, firstValue * 45 + ALPHANUMERIC_CHARACTERS.indexOf(messageText[start + 1]), 11);
+        } else {
+          appendBits(payloadBits, firstValue, 6);
+        }
+      }
+      return { payloadBits, characterCount: messageText.length };
+    }
+    const messageBytes = new TextEncoder().encode(messageText);
+    messageBytes.forEach((byteValue) => appendBits(payloadBits, byteValue, 8));
+    return { payloadBits, characterCount: messageBytes.length };
+  }
+
+  /** The number of modules that can hold data and error correction in a version. */
+  function rawDataModuleCount(version) {
+    let moduleCount = (16 * version + 128) * version + 64;
+    if (version >= 2) {
+      const alignmentCount = Math.floor(version / 7) + 2;
+      moduleCount -= (25 * alignmentCount - 10) * alignmentCount - 55;
+      if (version >= 7) moduleCount -= 36;
+    }
+    return moduleCount;
+  }
+
+  /** The number of data codewords (not counting error correction) in a version and level. */
+  function dataCodewordCount(version, eccLevel) {
+    return Math.floor(rawDataModuleCount(version) / 8)
+      - ECC_CODEWORDS_PER_BLOCK[eccLevel][version] * ECC_BLOCK_COUNT[eccLevel][version];
+  }
+
+  function countBitsFor(modeName, version) {
+    const countBitsList = ENCODING_MODES[modeName].countBits;
+    if (version <= 9) return countBitsList[0];
+    return version <= 26 ? countBitsList[1] : countBitsList[2];
+  }
+
+  /** Multiply in the Galois field GF(2^8) that QR codes use. */
+  function multiplyGalois(firstValue, secondValue) {
+    let product = 0;
+    for (let bitIndex = 7; bitIndex >= 0; bitIndex--) {
+      product = (product << 1) ^ ((product >>> 7) * 0x11d);
+      product ^= ((secondValue >>> bitIndex) & 1) * firstValue;
+    }
+    return product;
+  }
+
+  /** The Reed-Solomon generator for a given number of error-correction codewords. */
+  function reedSolomonDivisor(degree) {
+    const divisor = new Array(degree).fill(0);
+    divisor[degree - 1] = 1;
+    let root = 1;
+    for (let round = 0; round < degree; round++) {
+      for (let index = 0; index < degree; index++) {
+        divisor[index] = multiplyGalois(divisor[index], root);
+        if (index + 1 < degree) divisor[index] ^= divisor[index + 1];
+      }
+      root = multiplyGalois(root, 0x02);
+    }
+    return divisor;
+  }
+
+  /** The error-correction codewords for one block of data. */
+  function reedSolomonRemainder(dataBlock, divisor) {
+    const remainder = new Array(divisor.length).fill(0);
+    dataBlock.forEach((dataByte) => {
+      const factor = dataByte ^ remainder.shift();
+      remainder.push(0);
+      divisor.forEach((divisorValue, index) => { remainder[index] ^= multiplyGalois(divisorValue, factor); });
+    });
+    return remainder;
+  }
+
+  /** Split the data into blocks, add error correction, and interleave the result. */
+  function addErrorCorrection(dataCodewords, version, eccLevel) {
+    const blockCount = ECC_BLOCK_COUNT[eccLevel][version];
+    const eccLength = ECC_CODEWORDS_PER_BLOCK[eccLevel][version];
+    const totalCodewords = Math.floor(rawDataModuleCount(version) / 8);
+    const shortBlockCount = blockCount - (totalCodewords % blockCount);
+    const shortBlockLength = Math.floor(totalCodewords / blockCount);
+    const divisor = reedSolomonDivisor(eccLength);
+
+    const blocks = [];
+    let readPosition = 0;
+    for (let blockIndex = 0; blockIndex < blockCount; blockIndex++) {
+      const dataLength = shortBlockLength - eccLength + (blockIndex < shortBlockCount ? 0 : 1);
+      const dataBlock = dataCodewords.slice(readPosition, readPosition + dataLength);
+      readPosition += dataLength;
+      const eccBlock = reedSolomonRemainder(dataBlock, divisor);
+      // A placeholder in short blocks lines up the columns; it is skipped below.
+      if (blockIndex < shortBlockCount) dataBlock.push(0);
+      blocks.push(dataBlock.concat(eccBlock));
+    }
+
+    const interleaved = [];
+    for (let column = 0; column < blocks[0].length; column++) {
+      blocks.forEach((block, blockIndex) => {
+        if (column !== shortBlockLength - eccLength || blockIndex >= shortBlockCount) interleaved.push(block[column]);
+      });
+    }
+    return interleaved;
+  }
+
+  /** Row and column centres of the alignment patterns in a version. */
+  function alignmentPositions(version) {
+    if (version === 1) return [];
+    const alignmentCount = Math.floor(version / 7) + 2;
+    const stepSize = Math.floor((version * 8 + alignmentCount * 3 + 5) / (alignmentCount * 4 - 4)) * 2;
+    const positions = [6];
+    for (let position = version * 4 + 10; positions.length < alignmentCount; position -= stepSize) {
+      positions.splice(1, 0, position);
+    }
+    return positions;
+  }
+
+  /** Draw everything except the data: finders, timing, alignment, version bits. */
+  function drawFunctionPatterns(matrix, version) {
+    const size = matrix.size;
+
+    for (let index = 0; index < size; index++) {
+      matrix.setFunction(6, index, index % 2 === 0);
+      matrix.setFunction(index, 6, index % 2 === 0);
+    }
+
+    [[3, 3], [size - 4, 3], [3, size - 4]].forEach(([centreX, centreY]) => {
+      for (let offsetY = -4; offsetY <= 4; offsetY++) {
+        for (let offsetX = -4; offsetX <= 4; offsetX++) {
+          const distance = Math.max(Math.abs(offsetX), Math.abs(offsetY));
+          const moduleX = centreX + offsetX;
+          const moduleY = centreY + offsetY;
+          if (moduleX >= 0 && moduleX < size && moduleY >= 0 && moduleY < size) {
+            matrix.setFunction(moduleX, moduleY, distance !== 2 && distance !== 4);
+          }
+        }
+      }
+    });
+
+    const positions = alignmentPositions(version);
+    const lastIndex = positions.length - 1;
+    positions.forEach((centreY, rowIndex) => {
+      positions.forEach((centreX, columnIndex) => {
+        // The three corners already hold finder patterns.
+        const atFinderCorner = (rowIndex === 0 && columnIndex === 0)
+          || (rowIndex === 0 && columnIndex === lastIndex)
+          || (rowIndex === lastIndex && columnIndex === 0);
+        if (atFinderCorner) return;
+        for (let offsetY = -2; offsetY <= 2; offsetY++) {
+          for (let offsetX = -2; offsetX <= 2; offsetX++) {
+            matrix.setFunction(centreX + offsetX, centreY + offsetY, Math.max(Math.abs(offsetX), Math.abs(offsetY)) !== 1);
+          }
+        }
+      });
+    });
+
+    // Reserve the format areas now; the real bits are drawn once the mask is chosen.
+    drawFormatBits(matrix, 'L', 0);
+
+    if (version >= 7) {
+      let remainder = version;
+      for (let round = 0; round < 12; round++) remainder = (remainder << 1) ^ ((remainder >>> 11) * 0x1f25);
+      const versionBits = (version << 12) | remainder;
+      for (let bitIndex = 0; bitIndex < 18; bitIndex++) {
+        const longSide = size - 11 + (bitIndex % 3);
+        const shortSide = Math.floor(bitIndex / 3);
+        const bitIsSet = getBit(versionBits, bitIndex);
+        matrix.setFunction(longSide, shortSide, bitIsSet);
+        matrix.setFunction(shortSide, longSide, bitIsSet);
+      }
+    }
+  }
+
+  /** Draw the two copies of the level and mask information. */
+  function drawFormatBits(matrix, eccLevel, maskNumber) {
+    const size = matrix.size;
+    const formatData = (ECC_FORMAT_BITS[eccLevel] << 3) | maskNumber;
+    let remainder = formatData;
+    for (let round = 0; round < 10; round++) remainder = (remainder << 1) ^ ((remainder >>> 9) * 0x537);
+    const formatBits = ((formatData << 10) | remainder) ^ 0x5412;
+
+    for (let bitIndex = 0; bitIndex <= 5; bitIndex++) matrix.setFunction(8, bitIndex, getBit(formatBits, bitIndex));
+    matrix.setFunction(8, 7, getBit(formatBits, 6));
+    matrix.setFunction(8, 8, getBit(formatBits, 7));
+    matrix.setFunction(7, 8, getBit(formatBits, 8));
+    for (let bitIndex = 9; bitIndex < 15; bitIndex++) matrix.setFunction(14 - bitIndex, 8, getBit(formatBits, bitIndex));
+
+    for (let bitIndex = 0; bitIndex < 8; bitIndex++) matrix.setFunction(size - 1 - bitIndex, 8, getBit(formatBits, bitIndex));
+    for (let bitIndex = 8; bitIndex < 15; bitIndex++) matrix.setFunction(8, size - 15 + bitIndex, getBit(formatBits, bitIndex));
+    matrix.setFunction(8, size - 8, true);
+  }
+
+  /** Place the codewords in the zigzag path, skipping the vertical timing column. */
+  function drawCodewords(matrix, codewords) {
+    const size = matrix.size;
+    let bitPosition = 0;
+    for (let rightColumn = size - 1; rightColumn >= 1; rightColumn -= 2) {
+      if (rightColumn === 6) rightColumn = 5;
+      for (let step = 0; step < size; step++) {
+        for (let side = 0; side < 2; side++) {
+          const moduleX = rightColumn - side;
+          const goingUp = ((rightColumn + 1) & 2) === 0;
+          const moduleY = goingUp ? size - 1 - step : step;
+          if (!matrix.isFunction[moduleY][moduleX] && bitPosition < codewords.length * 8) {
+            matrix.modules[moduleY][moduleX] = getBit(codewords[bitPosition >>> 3], 7 - (bitPosition & 7));
+            bitPosition++;
+          }
+        }
+      }
+    }
+  }
+
+  // The eight mask patterns in the standard. A module flips where the result is true.
+  const MASK_RULES = [
+    (x, y) => (x + y) % 2 === 0,
+    (x, y) => y % 2 === 0,
+    (x) => x % 3 === 0,
+    (x, y) => (x + y) % 3 === 0,
+    (x, y) => (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0,
+    (x, y) => ((x * y) % 2) + ((x * y) % 3) === 0,
+    (x, y) => (((x * y) % 2) + ((x * y) % 3)) % 2 === 0,
+    (x, y) => (((x + y) % 2) + ((x * y) % 3)) % 2 === 0,
+  ];
+
+  /** Flip the data modules that the mask selects. Doing it twice undoes it. */
+  function applyMask(matrix, maskNumber) {
+    const maskRule = MASK_RULES[maskNumber];
+    for (let moduleY = 0; moduleY < matrix.size; moduleY++) {
+      for (let moduleX = 0; moduleX < matrix.size; moduleX++) {
+        if (!matrix.isFunction[moduleY][moduleX] && maskRule(moduleX, moduleY)) {
+          matrix.modules[moduleY][moduleX] = !matrix.modules[moduleY][moduleX];
+        }
+      }
+    }
+  }
+
+  /** Penalty for one row or column: long runs (rule 1) and finder look-alikes (rule 3). */
+  function lineScore(moduleLine) {
+    let score = 0;
+    let runLength = 1;
+    for (let index = 1; index <= moduleLine.length; index++) {
+      if (index < moduleLine.length && moduleLine[index] === moduleLine[index - 1]) {
+        runLength++;
+      } else {
+        if (runLength >= 5) score += 3 + (runLength - 5);
+        runLength = 1;
+      }
+    }
+    const lineText = moduleLine.map((moduleIsDark) => (moduleIsDark ? '1' : '0')).join('');
+    ['10111010000', '00001011101'].forEach((finderPattern) => {
+      let foundAt = lineText.indexOf(finderPattern);
+      while (foundAt !== -1) {
+        score += 40;
+        foundAt = lineText.indexOf(finderPattern, foundAt + 1);
+      }
+    });
+    return score;
+  }
+
+  /** How hard the masked code is to scan, by the four rules in the standard. Lower is better. */
+  function penaltyScore(matrix) {
+    const size = matrix.size;
+    const modules = matrix.modules;
+    let score = 0;
+    let darkCount = 0;
+
+    for (let rowIndex = 0; rowIndex < size; rowIndex++) {
+      score += lineScore(modules[rowIndex]);
+      score += lineScore(modules.map((moduleRow) => moduleRow[rowIndex]));
+    }
+    for (let moduleY = 0; moduleY < size; moduleY++) {
+      for (let moduleX = 0; moduleX < size; moduleX++) {
+        if (modules[moduleY][moduleX]) darkCount++;
+        if (moduleX < size - 1 && moduleY < size - 1) {
+          const colour = modules[moduleY][moduleX];
+          if (colour === modules[moduleY][moduleX + 1] && colour === modules[moduleY + 1][moduleX] && colour === modules[moduleY + 1][moduleX + 1]) {
+            score += 3;
+          }
+        }
+      }
+    }
+    const totalCount = size * size;
+    score += (Math.ceil(Math.abs(darkCount * 20 - totalCount * 10) / totalCount) - 1) * 10;
+    return score;
+  }
+
+  /** An empty code, with a record of which modules are not data. */
+  function createMatrix(version) {
+    const size = version * 4 + 17;
+    const emptyGrid = () => Array.from({ length: size }, () => new Array(size).fill(false));
+    const matrix = {
+      size,
+      modules: emptyGrid(),
+      isFunction: emptyGrid(),
+      setFunction(moduleX, moduleY, moduleIsDark) {
+        matrix.modules[moduleY][moduleX] = moduleIsDark;
+        matrix.isFunction[moduleY][moduleX] = true;
+      },
+    };
+    return matrix;
+  }
+
+  /**
+   * Build a QR code for the text at the given level. Picks the smallest version
+   * that fits. Throws an Error with a readable message when the text is too long.
+   */
+  function encodeQrCode(messageText, eccLevel) {
+    const modeName = chooseMode(messageText);
+    const { payloadBits, characterCount } = encodePayload(messageText, modeName);
+
+    let version = 0;
+    let usedBitCount = 0;
+    for (let tryVersion = FIRST_VERSION; tryVersion <= LAST_VERSION; tryVersion++) {
+      const countBits = countBitsFor(modeName, tryVersion);
+      const neededBits = 4 + countBits + payloadBits.length;
+      if (characterCount < 2 ** countBits && neededBits <= dataCodewordCount(tryVersion, eccLevel) * 8) {
+        version = tryVersion;
+        usedBitCount = neededBits;
+        break;
+      }
+    }
+    if (version === 0) {
+      const largestCapacity = dataCodewordCount(LAST_VERSION, eccLevel) * 8;
+      throw new Error(`This is too long for a QR code at level ${eccLevel}: it needs ${4 + countBitsFor(modeName, LAST_VERSION) + payloadBits.length} bits and the largest code holds ${largestCapacity}. Shorten the text or pick a lower error correction.`);
+    }
+
+    const capacityBits = dataCodewordCount(version, eccLevel) * 8;
+    const dataBits = [];
+    appendBits(dataBits, ENCODING_MODES[modeName].marker, 4);
+    appendBits(dataBits, characterCount, countBitsFor(modeName, version));
+    payloadBits.forEach((bitValue) => dataBits.push(bitValue));
+
+    // Terminator, then zeros up to a whole byte, then the two fixed padding bytes in turn.
+    appendBits(dataBits, 0, Math.min(4, capacityBits - dataBits.length));
+    appendBits(dataBits, 0, (8 - (dataBits.length % 8)) % 8);
+    for (let padByte = 0xec; dataBits.length < capacityBits; padByte ^= 0xec ^ 0x11) appendBits(dataBits, padByte, 8);
+
+    const dataCodewords = [];
+    for (let bitIndex = 0; bitIndex < dataBits.length; bitIndex += 8) {
+      dataCodewords.push(dataBits.slice(bitIndex, bitIndex + 8).reduce((byteValue, bitValue) => (byteValue << 1) | bitValue, 0));
+    }
+
+    const matrix = createMatrix(version);
+    drawFunctionPatterns(matrix, version);
+    drawCodewords(matrix, addErrorCorrection(dataCodewords, version, eccLevel));
+
+    // Try all eight masks and keep the one with the lowest penalty.
+    let bestMask = 0;
+    let bestScore = Infinity;
+    for (let maskNumber = 0; maskNumber < MASK_RULES.length; maskNumber++) {
+      applyMask(matrix, maskNumber);
+      drawFormatBits(matrix, eccLevel, maskNumber);
+      const maskScore = penaltyScore(matrix);
+      if (maskScore < bestScore) {
+        bestMask = maskNumber;
+        bestScore = maskScore;
+      }
+      applyMask(matrix, maskNumber);
+    }
+    applyMask(matrix, bestMask);
+    drawFormatBits(matrix, eccLevel, bestMask);
+
+    return { version, size: matrix.size, modules: matrix.modules, modeName, eccLevel, maskNumber: bestMask, usedBitCount, capacityBits };
+  }
+
+  /* ---------- Page ---------- */
+
+  // The empty border the standard asks for, in modules.
+  const QUIET_ZONE_MODULES = 4;
+  const SMALLEST_SCALE = 1;
+  const LARGEST_SCALE = 40;
+  const SAFE_CONTRAST_RATIO = 3;
+
+  const EXAMPLE_TEXT = 'https://www.dx.se/tools/';
+
+  // Page elements we read from or write to.
+  const contentTypeRadios = document.querySelectorAll('input[name="contentType"]');
+  const errorCorrectionRadios = document.querySelectorAll('input[name="errorCorrection"]');
+  const textFields = document.getElementById('textFields');
+  const textInput = document.getElementById('textInput');
+  const wifiFields = document.getElementById('wifiFields');
+  const wifiNameInput = document.getElementById('wifiNameInput');
+  const wifiPasswordInput = document.getElementById('wifiPasswordInput');
+  const wifiSecuritySelect = document.getElementById('wifiSecuritySelect');
+  const wifiHiddenCheckbox = document.getElementById('wifiHiddenCheckbox');
+  const scaleInput = document.getElementById('scaleInput');
+  const darkColorInput = document.getElementById('darkColorInput');
+  const lightColorInput = document.getElementById('lightColorInput');
+  const messageOutput = document.getElementById('messageOutput');
+  const codeArea = document.getElementById('codeArea');
+  const qrCanvas = document.getElementById('qrCanvas');
+  const versionOutput = document.getElementById('versionOutput');
+  const sizeOutput = document.getElementById('sizeOutput');
+  const imageSizeOutput = document.getElementById('imageSizeOutput');
+  const modeOutput = document.getElementById('modeOutput');
+  const capacityOutput = document.getElementById('capacityOutput');
+  const saveActions = document.getElementById('saveActions');
+  const downloadPngButton = document.getElementById('downloadPngButton');
+  const downloadSvgButton = document.getElementById('downloadSvgButton');
+  const copyImageButton = document.getElementById('copyImageButton');
+  const copySvgButton = document.getElementById('copySvgButton');
+  const copyStatus = document.getElementById('copyStatus');
+  const pageLinkOutput = document.getElementById('pageLinkOutput');
+  const copyLinkButton = document.getElementById('copyLinkButton');
+  const linkCopyStatus = document.getElementById('linkCopyStatus');
+  const linkHint = document.getElementById('linkHint');
+
+  // The code drawn last, or null when there is nothing to save.
+  let currentCode = null;
+
+  function selectedRadioValue(radioList) {
+    return [...radioList].find((radioButton) => radioButton.checked).value;
+  }
+
+  /** Wi-Fi fields need a backslash before these characters. */
+  function escapeWifiText(rawText) {
+    return rawText.replace(/([\\;,":])/g, '\\$1');
+  }
+
+  /** The standard Wi-Fi login text that phones understand. */
+  function buildWifiText() {
+    const networkName = wifiNameInput.value;
+    if (networkName === '') return '';
+    const securityType = wifiSecuritySelect.value;
+    const passwordPart = securityType === 'nopass' ? '' : `P:${escapeWifiText(wifiPasswordInput.value)};`;
+    const hiddenPart = wifiHiddenCheckbox.checked ? 'H:true;' : '';
+    return `WIFI:T:${securityType};S:${escapeWifiText(networkName)};${passwordPart}${hiddenPart};`;
+  }
+
+  /** The text to encode for the content type picked. */
+  function currentMessageText() {
+    return selectedRadioValue(contentTypeRadios) === 'wifi' ? buildWifiText() : textInput.value;
+  }
+
+  function readScale() {
+    const typedScale = Math.floor(Number(scaleInput.value));
+    if (!Number.isFinite(typedScale)) return SMALLEST_SCALE;
+    return Math.min(LARGEST_SCALE, Math.max(SMALLEST_SCALE, typedScale));
+  }
+
+  /** How bright a #rrggbb colour looks, as WCAG defines it. */
+  function relativeLuminance(hexColor) {
+    const [redValue, greenValue, blueValue] = [1, 3, 5]
+      .map((start) => parseInt(hexColor.slice(start, start + 2), 16) / 255)
+      .map((channel) => (channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * redValue + 0.7152 * greenValue + 0.0722 * blueValue;
+  }
+
+  /** A warning when the colours would be hard to scan, or an empty string. */
+  function colorWarning() {
+    const darkLuminance = relativeLuminance(darkColorInput.value);
+    const lightLuminance = relativeLuminance(lightColorInput.value);
+    if (darkLuminance >= lightLuminance) {
+      return 'The squares are lighter than the background. Many scanners cannot read an inverted code.';
+    }
+    if ((lightLuminance + 0.05) / (darkLuminance + 0.05) < SAFE_CONTRAST_RATIO) {
+      return 'These colours are close to each other, so some scanners may fail. Test the code before printing it.';
+    }
+    return '';
+  }
+
+  /** Draw the code on the canvas, with its quiet zone. */
+  function drawCanvas(qrCode) {
+    const scale = readScale();
+    const fullModules = qrCode.size + QUIET_ZONE_MODULES * 2;
+    qrCanvas.width = fullModules * scale;
+    qrCanvas.height = fullModules * scale;
+
+    const drawingContext = qrCanvas.getContext('2d');
+    drawingContext.fillStyle = lightColorInput.value;
+    drawingContext.fillRect(0, 0, qrCanvas.width, qrCanvas.height);
+    drawingContext.fillStyle = darkColorInput.value;
+    qrCode.modules.forEach((moduleRow, moduleY) => {
+      moduleRow.forEach((moduleIsDark, moduleX) => {
+        if (moduleIsDark) {
+          drawingContext.fillRect((moduleX + QUIET_ZONE_MODULES) * scale, (moduleY + QUIET_ZONE_MODULES) * scale, scale, scale);
+        }
+      });
+    });
+  }
+
+  /** The code as an SVG document: one background and one path, so it scales cleanly. */
+  function buildSvgText(qrCode) {
+    const fullModules = qrCode.size + QUIET_ZONE_MODULES * 2;
+    const pathParts = [];
+    qrCode.modules.forEach((moduleRow, moduleY) => {
+      moduleRow.forEach((moduleIsDark, moduleX) => {
+        if (moduleIsDark) pathParts.push(`M${moduleX + QUIET_ZONE_MODULES},${moduleY + QUIET_ZONE_MODULES}h1v1h-1z`);
+      });
+    });
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${fullModules} ${fullModules}" shape-rendering="crispEdges">`
+      + `<rect width="${fullModules}" height="${fullModules}" fill="${lightColorInput.value}"/>`
+      + `<path d="${pathParts.join('')}" fill="${darkColorInput.value}"/></svg>`;
+  }
+
+  function showMessage(messageText) {
+    messageOutput.textContent = messageText;
+    messageOutput.hidden = !messageText;
+  }
+
+  /** Re-read everything and redraw. */
+  function refresh() {
+    const isWifi = selectedRadioValue(contentTypeRadios) === 'wifi';
+    textFields.hidden = isWifi;
+    wifiFields.hidden = !isWifi;
+    wifiPasswordInput.disabled = wifiSecuritySelect.value === 'nopass';
+    linkHint.hidden = !isWifi;
+    pageLinkOutput.value = buildPageLink();
+    copyStatus.textContent = '';
+    linkCopyStatus.textContent = '';
+
+    const messageText = currentMessageText();
+    currentCode = null;
+    let messageToShow = '';
+    if (messageText === '') {
+      messageToShow = isWifi ? 'Type the network name to make a code.' : 'Type some text to make a code.';
+    } else {
+      try {
+        currentCode = encodeQrCode(messageText, selectedRadioValue(errorCorrectionRadios));
+        messageToShow = colorWarning();
+      } catch (encodeError) {
+        messageToShow = encodeError.message;
+      }
+    }
+
+    showMessage(messageToShow);
+    codeArea.hidden = !currentCode;
+    saveActions.hidden = !currentCode;
+    if (!currentCode) return;
+
+    drawCanvas(currentCode);
+    qrCanvas.setAttribute('aria-label', `QR code holding: ${isWifi ? `Wi-Fi network ${wifiNameInput.value}` : messageText}`);
+    versionOutput.textContent = String(currentCode.version);
+    sizeOutput.textContent = `${currentCode.size} × ${currentCode.size} squares`;
+    imageSizeOutput.textContent = `${qrCanvas.width} × ${qrCanvas.height} px`;
+    modeOutput.textContent = ENCODING_MODES[currentCode.modeName].name;
+    capacityOutput.textContent = `${Math.round((currentCode.usedBitCount / currentCode.capacityBits) * 100)}%`;
+  }
+
+  /* ---------- Saving and copying ---------- */
+
+  /** Hand a blob to the browser as a file download. */
+  function downloadBlob(fileBlob, fileName) {
+    const objectAddress = URL.createObjectURL(fileBlob);
+    const downloadLink = document.createElement('a');
+    downloadLink.href = objectAddress;
+    downloadLink.download = fileName;
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    downloadLink.remove();
+    URL.revokeObjectURL(objectAddress);
+  }
+
+  /** The canvas as a PNG blob. */
+  function canvasToPngBlob() {
+    return new Promise((resolve) => qrCanvas.toBlob(resolve, 'image/png'));
+  }
+
+  /** Put text on the clipboard, with the older copy command as a fallback. */
+  async function writeToClipboard(plainText) {
+    try {
+      await navigator.clipboard.writeText(plainText);
+      return true;
+    } catch (clipboardError) {
+      const fillClipboard = (copyEvent) => {
+        copyEvent.clipboardData.setData('text/plain', plainText);
+        copyEvent.preventDefault();
+      };
+      document.addEventListener('copy', fillClipboard, { once: true });
+      const copySucceeded = document.execCommand('copy');
+      document.removeEventListener('copy', fillClipboard);
+      return copySucceeded;
+    }
+  }
+
+  /* ---------- Link with the content filled in ---------- */
+
+  /**
+   * Encode only the characters that would break the query string (% & = # +)
+   * and line breaks. Spaces stay as plain spaces so the link is readable.
+   */
+  function encodeQueryPart(rawText) {
+    return rawText
+      .replace(/%/g, '%25').replace(/&/g, '%26').replace(/=/g, '%3D')
+      .replace(/#/g, '%23').replace(/\+/g, '%2B')
+      .replace(/\r?\n/g, '%0A').replace(/\t/g, '%09');
+  }
+
+  /** This page's address with the content and options. The Wi-Fi password is never included. */
+  function buildPageLink() {
+    const pageAddress = window.location.href.split(/[?#]/)[0];
+    const queryParts = [];
+    if (selectedRadioValue(contentTypeRadios) === 'wifi') {
+      queryParts.push('type=wifi', `ssid=${encodeQueryPart(wifiNameInput.value)}`, `security=${wifiSecuritySelect.value}`);
+      if (wifiHiddenCheckbox.checked) queryParts.push('hidden=1');
+    } else if (textInput.value) {
+      queryParts.push(`text=${encodeQueryPart(textInput.value)}`);
+    }
+    if (selectedRadioValue(errorCorrectionRadios) !== 'M') queryParts.push(`level=${selectedRadioValue(errorCorrectionRadios)}`);
+    if (readScale() !== 8) queryParts.push(`scale=${readScale()}`);
+    if (darkColorInput.value !== '#000000') queryParts.push(`dark=${darkColorInput.value.slice(1)}`);
+    if (lightColorInput.value !== '#ffffff') queryParts.push(`light=${lightColorInput.value.slice(1)}`);
+    return queryParts.length ? `${pageAddress}?${queryParts.join('&')}` : pageAddress;
+  }
+
+  /** Read one ?name=... from the address. Plain spaces, + and %20 all mean a space. */
+  function readQueryParameter(parameterName) {
+    const parameterMatch = window.location.search.match(new RegExp(`[?&]${parameterName}=([^&]*)`));
+    if (!parameterMatch) return null;
+    const withSpaces = parameterMatch[1].replace(/\+/g, ' ');
+    try { return decodeURIComponent(withSpaces); } catch (decodeError) { return withSpaces; }
+  }
+
+  function selectRadio(radioList, radioValue) {
+    const matchingRadio = [...radioList].find((radioButton) => radioButton.value === radioValue);
+    if (matchingRadio) matchingRadio.checked = true;
+  }
+
+  /* ---------- Events ---------- */
+
+  [textInput, wifiNameInput, wifiPasswordInput, scaleInput, darkColorInput, lightColorInput]
+    .forEach((inputElement) => inputElement.addEventListener('input', refresh));
+  [wifiSecuritySelect, wifiHiddenCheckbox].forEach((inputElement) => inputElement.addEventListener('change', refresh));
+  [...contentTypeRadios, ...errorCorrectionRadios].forEach((radioButton) => radioButton.addEventListener('change', refresh));
+
+  // Show the scale that was actually used when the box was left out of range.
+  scaleInput.addEventListener('change', () => { scaleInput.value = String(readScale()); });
+
+  downloadPngButton.addEventListener('click', async () => {
+    downloadBlob(await canvasToPngBlob(), 'qr-code.png');
+  });
+
+  downloadSvgButton.addEventListener('click', () => {
+    downloadBlob(new Blob([buildSvgText(currentCode)], { type: 'image/svg+xml' }), 'qr-code.svg');
+  });
+
+  copyImageButton.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': canvasToPngBlob() })]);
+      copyStatus.textContent = 'Copied';
+    } catch (clipboardError) {
+      copyStatus.textContent = 'Your browser blocked copying images here. Use Save PNG instead.';
+    }
+  });
+
+  copySvgButton.addEventListener('click', async () => {
+    const copySucceeded = await writeToClipboard(buildSvgText(currentCode));
+    copyStatus.textContent = copySucceeded ? 'Copied' : 'Your browser blocked the clipboard.';
+  });
+
+  copyLinkButton.addEventListener('click', async () => {
+    const copySucceeded = await writeToClipboard(pageLinkOutput.value);
+    if (!copySucceeded) pageLinkOutput.select();
+    linkCopyStatus.textContent = copySucceeded ? 'Copied' : 'Selected. Press Ctrl+C to copy.';
+  });
+
+  /* ---------- Start ---------- */
+
+  selectRadio(contentTypeRadios, readQueryParameter('type'));
+  selectRadio(errorCorrectionRadios, readQueryParameter('level'));
+  if (readQueryParameter('scale') !== null) scaleInput.value = readQueryParameter('scale');
+  scaleInput.value = String(readScale());
+  const colorPattern = /^[0-9a-f]{6}$/i;
+  if (colorPattern.test(readQueryParameter('dark') ?? '')) darkColorInput.value = `#${readQueryParameter('dark')}`;
+  if (colorPattern.test(readQueryParameter('light') ?? '')) lightColorInput.value = `#${readQueryParameter('light')}`;
+  wifiNameInput.value = readQueryParameter('ssid') ?? '';
+  if (['WPA', 'WEP', 'nopass'].includes(readQueryParameter('security'))) wifiSecuritySelect.value = readQueryParameter('security');
+  wifiHiddenCheckbox.checked = readQueryParameter('hidden') === '1';
+  textInput.value = readQueryParameter('text') ?? (window.location.search ? '' : EXAMPLE_TEXT);
+  refresh();
+</script>
+</body>
+</html>
