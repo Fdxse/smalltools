@@ -10,5 +10,6 @@
   { "file": "cron-explainer.html", "title": "Cron Explainer" },
   { "file": "qr-code.html", "title": "QR Code Generator" },
   { "file": "color-picker.html", "title": "Color Picker and Contrast Checker" },
-  { "file": "subnet-calculator.html", "title": "IP Subnet Calculator" }
+  { "file": "subnet-calculator.html", "title": "IP Subnet Calculator" },
+  { "file": "ipv6-guide.html", "title": "IPv6 Guide and Quiz" }
 ]

@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IPv6 guide and quiz</title>
+<style>
+  /* Same colour scheme and layout as flag-decoder.html. */
+  :root {
+    --page-background: #f3f5f8;
+    --panel-background: #ffffff;
+    --text-color: #1b2230;
+    --muted-text-color: #5b6477;
+    --border-color: #d6dbe4;
+    --accent-color: #2457d6;
+    --accent-text-color: #ffffff;
+    --pass-background: #e3f3e8;
+    --pass-text-color: #17512c;
+    --fail-background: #fbe4e4;
+    --fail-text-color: #7d1f1f;
+    --warning-background: #fff3d6;
+    --warning-text-color: #6b4a00;
+    --code-background: #eceff4;
+    --body-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono-font: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page-background: #13161c;
+      --panel-background: #1c2028;
+      --text-color: #e5e8ee;
+      --muted-text-color: #98a1b3;
+      --border-color: #323947;
+      --accent-color: #7ea1ff;
+      --accent-text-color: #0f1420;
+      --pass-background: #1d3828;
+      --pass-text-color: #a9e4bd;
+      --fail-background: #41201f;
+      --fail-text-color: #f4b6b4;
+      --warning-background: #3a3018;
+      --warning-text-color: #f1d48a;
+      --code-background: #2a303b;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page-background: #13161c;
+    --panel-background: #1c2028;
+    --text-color: #e5e8ee;
+    --muted-text-color: #98a1b3;
+    --border-color: #323947;
+    --accent-color: #7ea1ff;
+    --accent-text-color: #0f1420;
+    --pass-background: #1d3828;
+    --pass-text-color: #a9e4bd;
+    --fail-background: #41201f;
+    --fail-text-color: #f4b6b4;
+    --warning-background: #3a3018;
+    --warning-text-color: #f1d48a;
+    --code-background: #2a303b;
+    color-scheme: dark;
+  }
+
+  /* Sections and grids set their own display, which would otherwise beat the hidden attribute. */
+  [hidden] { display: none !important; }
+
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+  body {
+    margin: 0;
+    background: var(--page-background);
+    color: var(--text-color);
+    font-family: var(--body-font);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  main {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 24px 16px 40px;
+    display: grid;
+    gap: 18px;
+  }
+  h1 { margin: 0; font-size: 24px; text-wrap: balance; }
+  h2 { margin: 0; font-size: 18px; }
+  h3 { margin: 6px 0 0; font-size: 15px; }
+  p { margin: 0; max-width: 72ch; }
+  .intro { margin: 6px 0 0; color: var(--muted-text-color); max-width: 65ch; }
+  a { color: var(--accent-color); }
+  code { font-family: var(--mono-font); font-size: 0.92em; background: var(--code-background); border-radius: 3px; padding: 1px 4px; overflow-wrap: anywhere; }
+  ul.prose-list, ol.prose-list { margin: 0; padding-left: 22px; max-width: 72ch; display: grid; gap: 4px; }
+
+  section {
+    background: var(--panel-background);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    min-width: 0;
+    display: grid;
+    gap: 12px;
+    scroll-margin-top: 10px;
+  }
+  .section-header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+
+  .page-links { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; }
+
+  input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background: var(--page-background);
+    color: var(--text-color);
+    font: inherit;
+  }
+  input.mono-input { font-family: var(--mono-font); }
+  input.value-input { font-family: var(--mono-font); font-size: 18px; padding: 9px 11px; }
+  input.invalid { border-color: #d64545; }
+  input:focus-visible, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 1px; }
+
+  button {
+    padding: 8px 14px;
+    border: 1px solid var(--accent-color);
+    border-radius: 5px;
+    background: var(--accent-color);
+    color: var(--accent-text-color);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary { background: transparent; color: var(--accent-color); }
+  button.small-button { padding: 3px 9px; font-size: 13px; font-weight: 500; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+  .muted { color: var(--muted-text-color); font-variant-numeric: tabular-nums; }
+  .small { font-size: 13px; }
+  .warning-message { background: var(--warning-background); color: var(--warning-text-color); border-radius: 5px; padding: 8px 10px; margin: 0; max-width: none; }
+  .right-message { background: var(--pass-background); color: var(--pass-text-color); border-radius: 5px; padding: 8px 10px; margin: 0; max-width: none; }
+  .wrong-message { background: var(--fail-background); color: var(--fail-text-color); border-radius: 5px; padding: 8px 10px; margin: 0; max-width: none; }
+
+  /* Choice drawn as a row of segmented buttons. */
+  .format-choice { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--border-color); border-radius: 5px; overflow: hidden; width: fit-content; }
+  .format-choice label { padding: 7px 14px; cursor: pointer; border-right: 1px solid var(--border-color); }
+  .format-choice label:last-child { border-right: none; }
+  .format-choice input { position: absolute; opacity: 0; pointer-events: none; }
+  .format-choice label:has(input:checked) { background: var(--accent-color); color: var(--accent-text-color); font-weight: 600; }
+  .format-choice label:has(input:focus-visible) { outline: 2px solid var(--accent-color); outline-offset: -2px; }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--border-color); border-radius: 5px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { font-size: 13px; color: var(--muted-text-color); font-weight: 600; }
+  tbody td { border-top: 1px solid var(--border-color); }
+  td.mono { font-family: var(--mono-font); font-size: 13px; overflow-wrap: anywhere; }
+  td.nowrap, #types td.mono { white-space: nowrap; }
+
+  /* One row per value: name, value, copy button. */
+  .result-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border-color); border-radius: 5px; }
+  .result-list li {
+    display: grid;
+    grid-template-columns: 150px minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 10px;
+  }
+  .result-list li + li { border-top: 1px solid var(--border-color); }
+  .result-name { color: var(--muted-text-color); font-size: 13px; }
+  .result-value { font-family: var(--mono-font); overflow-wrap: anywhere; }
+  .result-value.plain-value { font-family: var(--body-font); }
+
+  /* Quiz */
+  .question-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; counter-reset: question; }
+  .question-list > li { counter-increment: question; }
+  fieldset { border: 1px solid var(--border-color); border-radius: 5px; margin: 0; padding: 12px; min-width: 0; display: grid; gap: 6px; }
+  legend { padding: 0; float: left; width: 100%; font-weight: 600; margin-bottom: 4px; }
+  legend::before { content: counter(question) ". "; }
+  .answer-option { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: start; padding: 6px 8px; border-radius: 4px; cursor: pointer; clear: both; }
+  .answer-option input { margin: 3px 0 0; width: 16px; height: 16px; accent-color: var(--accent-color); }
+  .answer-option.is-right { background: var(--pass-background); color: var(--pass-text-color); font-weight: 600; }
+  .answer-option.is-wrong { background: var(--fail-background); color: var(--fail-text-color); }
+  .answer-option:has(input:disabled) { cursor: default; }
+  .quiz-score { font-size: 18px; font-weight: 700; margin: 0; }
+
+  /* Phones: 16px inputs stop iOS from zooming in on focus; rows stack. */
+  @media (max-width: 640px) {
+    input[type="text"] { font-size: 16px; }
+    .result-list li { grid-template-columns: minmax(0, 1fr) auto; }
+    .result-name { grid-column: 1 / -1; }
+    .section-header .actions span:empty { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>IPv6 guide and quiz</h1>
+    <p class="intro">What IPv6 addresses look like, how they work and how IPv6 differs from IPv4. Look inside real addresses, practice writing them, then test yourself. Everything runs in this page and nothing is sent anywhere.</p>
+    <nav class="page-links" aria-label="On this page">
+      <a href="#format">Address format</a>
+      <a href="#types">Address types</a>
+      <a href="#getting">Getting an address</a>
+      <a href="#differences">Differences from IPv4</a>
+      <a href="#explorer">Address explorer</a>
+      <a href="#practice">Practice</a>
+      <a href="#quiz">Quiz</a>
+    </nav>
+  </header>
+
+  <!-- Explanation: the address format -->
+  <section id="format" aria-labelledby="formatHeading">
+    <h2 id="formatHeading">Address format</h2>
+    <p>An IPv6 address is 128 bits long, written as eight groups of four hex digits separated by colons. That gives about 3.4 × 10<sup>38</sup> addresses, compared with about 4.3 billion in IPv4.</p>
+    <p><code>2001:0db8:0000:0000:0000:ff00:0042:8329</code></p>
+
+    <h3>Writing it shorter</h3>
+    <ol class="prose-list">
+      <li>Remove the leading zeros in each group: <code>0db8</code> becomes <code>db8</code>, and <code>0000</code> becomes <code>0</code>.</li>
+      <li>Replace one run of zero groups with <code>::</code>. It can be used only once in an address, or nobody could tell how many zeros each one stands for.</li>
+      <li>Standard form (RFC 5952): use lowercase, shorten the longest run of two or more zero groups, and pick the first run if two are equally long.</li>
+    </ol>
+    <p>The address above becomes <code>2001:db8::ff00:42:8329</code>.</p>
+
+    <h3>Network and interface parts</h3>
+    <p>As in IPv4, a prefix says how many leading bits name the network: <code>2001:db8:1:2::5/64</code> is address <code>::5</code> in network <code>2001:db8:1:2::/64</code>. There are no dotted netmasks in IPv6, only prefix lengths.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Bits</th><th scope="col">Typical part</th><th scope="col">Who sets it</th></tr></thead>
+        <tbody>
+          <tr><td class="nowrap">First 48</td><td>Routing prefix</td><td>Your provider or registry. Sites commonly get a /48 or /56.</td></tr>
+          <tr><td class="nowrap">Next 16</td><td>Subnet ID</td><td>You. A /48 holds 65,536 subnets.</td></tr>
+          <tr><td class="nowrap">Last 64</td><td>Interface ID</td><td>The device or DHCPv6 server.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>A normal network is a /64. Automatic address setup depends on it, so use /64 for networks with hosts even though the addresses look wasteful. The interface part is not scarce: one /64 holds about 1.8 × 10<sup>19</sup> addresses.</p>
+
+    <h3>In URLs and DNS</h3>
+    <ul class="prose-list">
+      <li>Addresses in URLs go inside brackets, because colons also mark the port: <code>http://[2001:db8::1]:8080/</code>.</li>
+      <li>DNS uses <code>AAAA</code> records for IPv6 addresses, where IPv4 uses <code>A</code>. Reverse lookups use <code>ip6.arpa</code>.</li>
+      <li>A link-local address may need a zone saying which network card to use, such as <code>fe80::1%eth0</code>, because every link uses the same range.</li>
+    </ul>
+  </section>
+
+  <!-- Explanation: address types -->
+  <section id="types" aria-labelledby="typesHeading">
+    <h2 id="typesHeading">Address types</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Range</th><th scope="col">Type</th><th scope="col">Used for</th><th scope="col">IPv4 equivalent</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">2000::/3</td><td>Global unicast</td><td>Public addresses, reachable across the internet if firewalls allow it</td><td>Public addresses</td></tr>
+          <tr><td class="mono">fc00::/7</td><td>Unique local (ULA)</td><td>Private networks. Addresses in use start with <code>fd</code>, followed by a random ID, so merged networks rarely clash</td><td class="mono">10.0.0.0/8 and similar</td></tr>
+          <tr><td class="mono">fe80::/10</td><td>Link-local</td><td>Talking on the same link only; routers do not forward it. Every IPv6 interface has one</td><td class="mono">169.254.0.0/16</td></tr>
+          <tr><td class="mono">ff00::/8</td><td>Multicast</td><td>One sender, a group of receivers. <code>ff02::1</code> is all devices on the link, <code>ff02::2</code> all routers</td><td class="mono">224.0.0.0/4</td></tr>
+          <tr><td class="mono">::1/128</td><td>Loopback</td><td>The device itself</td><td class="mono">127.0.0.1</td></tr>
+          <tr><td class="mono">::/128</td><td>Unspecified</td><td>"No address yet", or "all addresses" when a server listens</td><td class="mono">0.0.0.0</td></tr>
+          <tr><td class="mono">2001:db8::/32</td><td>Documentation</td><td>Examples in text and manuals; never used on real networks</td><td class="mono">192.0.2.0/24</td></tr>
+          <tr><td class="mono">::ffff:0:0/96</td><td>IPv4-mapped</td><td>An IPv4 address seen through IPv6 software, such as <code>::ffff:192.0.2.1</code></td><td>None</td></tr>
+          <tr><td class="mono">64:ff9b::/96</td><td>NAT64</td><td>Lets IPv6-only devices reach IPv4 servers through a translator</td><td>None</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>A device usually has several addresses on one interface at once: a link-local one, one or more global ones, and maybe a ULA. Which one it sends from is chosen for each connection.</p>
+  </section>
+
+  <!-- Explanation: how a device gets an address -->
+  <section id="getting" aria-labelledby="gettingHeading">
+    <h2 id="gettingHeading">Getting an address</h2>
+    <ol class="prose-list">
+      <li>The device gives itself a link-local address and checks that nobody else uses it (duplicate address detection).</li>
+      <li>It asks for routers on the link. A router answers with a <em>router advertisement</em> holding the network prefix and whether to use DHCPv6.</li>
+      <li>The device then gets its global address, using one of the methods below. Its default gateway is the router's link-local address.</li>
+    </ol>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Method</th><th scope="col">How it works</th></tr></thead>
+        <tbody>
+          <tr><td class="nowrap">SLAAC</td><td>The device combines the advertised prefix with an interface ID it makes up itself. No server is needed, and this is why networks are /64.</td></tr>
+          <tr><td class="nowrap">DHCPv6</td><td>A server hands out addresses, like DHCP in IPv4. The default gateway still comes from router advertisements, not from DHCPv6. Android has traditionally not supported getting an address this way, so check your devices before relying on it.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Interface IDs and privacy</h3>
+    <p>Older systems built the interface ID from the network card's MAC address (EUI-64: split the MAC in the middle, insert <code>ff:fe</code>, flip one bit). That made a device trackable across networks, so systems now use random stable IDs and short-lived <em>temporary</em> addresses for outgoing connections. The explorer below shows the MAC when an address contains one.</p>
+  </section>
+
+  <!-- Explanation: differences from IPv4 -->
+  <section id="differences" aria-labelledby="differencesHeading">
+    <h2 id="differencesHeading">Differences from IPv4</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Topic</th><th scope="col">IPv4</th><th scope="col">IPv6</th></tr></thead>
+        <tbody>
+          <tr><td>Address size</td><td>32 bits</td><td>128 bits</td></tr>
+          <tr><td>Finding neighbors</td><td>ARP</td><td>Neighbor Discovery (NDP), which runs over ICMPv6 multicast</td></tr>
+          <tr><td>Broadcast</td><td>Yes</td><td>No. Multicast does that job</td></tr>
+          <tr><td>Setup</td><td>Static or DHCP</td><td>Static, SLAAC or DHCPv6</td></tr>
+          <tr><td>Fragmenting packets</td><td>Senders and routers</td><td>Senders only. Routers answer "Packet Too Big"</td></tr>
+          <tr><td>Smallest link MTU</td><td>68 bytes</td><td>1,280 bytes</td></tr>
+          <tr><td>Header</td><td>Variable size, with a checksum</td><td>Fixed 40 bytes, no checksum, optional extension headers</td></tr>
+          <tr><td>NAT</td><td>Almost everywhere</td><td>Normally not needed</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Common mistakes</h3>
+    <ul class="prose-list">
+      <li><strong>Blocking all ICMPv6.</strong> It breaks neighbor discovery and router advertisements, and also Path MTU Discovery, which shows up as connections that hang on large transfers.</li>
+      <li><strong>Assuming no NAT means no firewall is needed.</strong> Without NAT, global addresses can be reachable directly, so a firewall must decide what gets in. Check that its IPv6 rules match your IPv4 ones.</li>
+      <li><strong>Forgetting IPv6 is already on.</strong> Most systems enable it by default and prefer it when it works, so it can be in use on a network that was only planned for IPv4.</li>
+      <li><strong>Storing addresses as text.</strong> One address has many valid spellings. Convert to the standard form or to 16 bytes before comparing.</li>
+    </ul>
+    <h3>Running both</h3>
+    <p>Most networks run <em>dual stack</em>, with IPv4 and IPv6 side by side. Browsers try both and use whichever connects first, with a head start for IPv6 (Happy Eyeballs). IPv6-only networks reach IPv4 through NAT64 and DNS64 instead. The two protocols cannot talk directly without a translator.</p>
+  </section>
+
+  <!-- Look inside an address -->
+  <section id="explorer" aria-labelledby="explorerHeading">
+    <div class="section-header">
+      <h2 id="explorerHeading">Address explorer</h2>
+      <span class="muted" id="copyStatus" aria-live="polite"></span>
+    </div>
+    <input type="text" class="value-input" id="addressInput" autocomplete="off" spellcheck="false" aria-label="IPv6 address, with an optional prefix length">
+    <div class="actions" id="exampleButtons" aria-label="Example addresses"></div>
+    <p class="warning-message" id="addressMessage" hidden></p>
+    <div id="explorerResults" style="display:grid;gap:12px">
+      <ul class="result-list" id="resultList"></ul>
+      <h3 id="partsHeading">Parts of this address</h3>
+      <div class="table-wrap">
+        <table aria-labelledby="partsHeading">
+          <thead><tr><th scope="col">Part</th><th scope="col">Value</th><th scope="col">Bits</th></tr></thead>
+          <tbody id="partsTableBody"></tbody>
+        </table>
+      </div>
+      <p class="muted small" id="partsNote"></p>
+      <p class="small"><a id="subnetLink" href="subnet-calculator.html">Open this network in the IP subnet calculator</a></p>
+    </div>
+  </section>
+
+  <!-- Practice writing addresses -->
+  <section id="practice" aria-labelledby="practiceHeading">
+    <div class="section-header">
+      <h2 id="practiceHeading">Practice</h2>
+      <div class="format-choice" role="radiogroup" aria-label="What to practice">
+        <label><input type="radio" name="practiceMode" value="shorten" checked> Shorten</label>
+        <label><input type="radio" name="practiceMode" value="expand"> Expand</label>
+      </div>
+    </div>
+    <p id="practicePrompt"></p>
+    <p><code id="practiceAddress" style="font-size:16px"></code></p>
+    <input type="text" class="mono-input" id="practiceInput" autocomplete="off" spellcheck="false" aria-label="Your answer">
+    <div class="actions">
+      <button type="button" id="practiceCheckButton">Check</button>
+      <button type="button" class="secondary" id="practiceRevealButton">Show answer</button>
+      <button type="button" class="secondary" id="practiceNextButton">New address</button>
+      <span class="muted" id="practiceScore"></span>
+    </div>
+    <p id="practiceResult" aria-live="polite" hidden></p>
+  </section>
+
+  <!-- Test yourself -->
+  <section id="quiz" aria-labelledby="quizHeading">
+    <div class="section-header">
+      <h2 id="quizHeading">Quiz</h2>
+      <button type="button" class="secondary" id="quizRestartButton">Start over</button>
+    </div>
+    <p class="quiz-score" id="quizScore" aria-live="polite"></p>
+    <ol class="question-list" id="questionList"></ol>
+  </section>
+
+  <!-- Link that reopens the page with the address filled in -->
+  <section aria-labelledby="linkHeading">
+    <div class="section-header">
+      <h2 id="linkHeading">Link to this address</h2>
+      <div class="actions">
+        <span class="muted" id="linkCopyStatus" aria-live="polite"></span>
+        <button type="button" class="secondary" id="copyLinkButton">Copy link</button>
+      </div>
+    </div>
+    <input type="text" id="pageLinkOutput" readonly spellcheck="false" aria-label="Link to this page with the address in the explorer">
+  </section>
+</main>
+
+<script>
+  const IPV6_BITS = 128;
+  const DEFAULT_PREFIX = 64;
+  const ALL_ONES = (1n << 128n) - 1n;
+
+  // Example addresses for the explorer: [button text, address].
+  const EXAMPLE_ADDRESSES = [
+    ['Global', '2001:4860:4860::8888/64'],
+    ['Documentation', '2001:db8:1:2::5/64'],
+    ['Unique local', 'fd12:3456:789a:1::1/64'],
+    ['Link-local', 'fe80::1a2b:3cff:fe4d:5e6f/64'],
+    ['Multicast', 'ff02::1'],
+    ['Loopback', '::1'],
+    ['IPv4-mapped', '::ffff:192.0.2.1'],
+    ['NAT64', '64:ff9b::198.51.100.7'],
+  ];
+
+  // Address ranges. The first match wins, so narrow ranges come before wide ones.
+  const ADDRESS_TYPES = [
+    { range: '::/128', kind: 'unspecified', name: 'Unspecified', meaning: 'No address yet, or "all addresses" when a server listens.' },
+    { range: '::1/128', kind: 'loopback', name: 'Loopback', meaning: 'The device itself.' },
+    { range: '::ffff:0:0/96', kind: 'mapped', name: 'IPv4-mapped', meaning: 'An IPv4 address seen through IPv6 software.' },
+    { range: '64:ff9b::/96', kind: 'nat64', name: 'NAT64', meaning: 'An IPv4 server reached through a translator.' },
+    { range: '100::/64', kind: 'other', name: 'Discard only', meaning: 'Traffic sent here is dropped on purpose.' },
+    { range: '2001:db8::/32', kind: 'documentation', name: 'Documentation', meaning: 'For examples only, never used on real networks.' },
+    { range: '2002::/16', kind: '6to4', name: '6to4', meaning: 'An old way to tunnel IPv6 over IPv4, now deprecated.' },
+    { range: 'fc00::/7', kind: 'ula', name: 'Unique local (ULA)', meaning: 'Private network address, not routed on the internet.' },
+    { range: 'fe80::/10', kind: 'linkLocal', name: 'Link-local', meaning: 'Only works on the same link. Routers do not forward it.' },
+    { range: 'ff00::/8', kind: 'multicast', name: 'Multicast', meaning: 'Sent to a group of receivers.' },
+    { range: '2000::/3', kind: 'global', name: 'Global unicast', meaning: 'Public address, reachable across the internet if firewalls allow it.' },
+    { range: '::/0', kind: 'other', name: 'Reserved', meaning: 'Not assigned for normal use at the moment.' },
+  ];
+
+  const MULTICAST_SCOPES = {
+    1: 'Interface-local',
+    2: 'Link-local',
+    4: 'Admin-local',
+    5: 'Site-local',
+    8: 'Organization-local',
+    14: 'Global',
+  };
+
+  const KNOWN_MULTICAST_GROUPS = [
+    ['ff02::1', 'All devices on the link'],
+    ['ff02::2', 'All routers on the link'],
+    ['ff02::1:2', 'All DHCPv6 servers and relays on the link'],
+    ['ff02::fb', 'Multicast DNS (mDNS)'],
+  ];
+
+  // Quiz questions. The first answer is the right one; answers are shuffled before they are shown.
+  const QUIZ_QUESTIONS = [
+    {
+      question: 'How long is an IPv6 address?',
+      answers: ['128 bits', '32 bits', '64 bits', '256 bits'],
+      explanation: 'IPv6 addresses are 128 bits, written as eight groups of 16 bits.',
+    },
+    {
+      question: 'What is the standard short form of 2001:0db8:0000:0000:0000:ff00:0042:8329?',
+      answers: ['2001:db8::ff00:42:8329', '2001:db8:0:0:0:ff00:42:8329', '2001:db8::ff:42:8329', '2001:0db8::ff00:0042:8329'],
+      explanation: 'Leading zeros go, so 0042 becomes 42, but trailing zeros stay, so ff00 stays ff00. The run of zero groups becomes ::.',
+    },
+    {
+      question: 'Why is 2001:db8::1::2 not a valid address?',
+      answers: [':: can only be used once', 'It has too many digits', 'A group cannot be just 1 or 2', 'It must end in ::'],
+      explanation: 'With two :: there is no way to tell how many zero groups each one stands for.',
+    },
+    {
+      question: 'What prefix length should a normal network with hosts use?',
+      answers: ['/64', '/24', '/48', '/120'],
+      explanation: 'SLAAC needs a 64-bit interface ID, so networks with hosts are /64.',
+    },
+    {
+      question: 'What is a fe80:: address?',
+      answers: ['Link-local: it only works on the same link', 'A public address', 'A private address that routes across a company', 'A multicast group'],
+      explanation: 'Every IPv6 interface has a link-local address, and routers do not forward these.',
+    },
+    {
+      question: 'What replaces ARP in IPv6?',
+      answers: ['Neighbor Discovery (NDP) over ICMPv6', 'DHCPv6', 'ARPv6', 'DNS AAAA records'],
+      explanation: 'NDP uses ICMPv6 messages sent to multicast groups to find neighbors and routers.',
+    },
+    {
+      question: 'How does IPv6 reach every device on a link?',
+      answers: ['Multicast to ff02::1, since there is no broadcast', 'The broadcast address, ending in all ones', 'A separate unicast packet to each device', 'It cannot'],
+      explanation: 'IPv6 has no broadcast. ff02::1 is the multicast group of all devices on the link.',
+    },
+    {
+      question: 'Which range is the closest match for private IPv4 addresses like 10.0.0.0/8?',
+      answers: ['Unique local, fc00::/7', 'Link-local, fe80::/10', 'Documentation, 2001:db8::/32', 'Global unicast, 2000::/3'],
+      explanation: 'Unique local addresses are for private networks. The ones in use start with fd.',
+    },
+    {
+      question: 'What is the IPv6 loopback address?',
+      answers: ['::1', '::', 'fe80::1', '127::1'],
+      explanation: '::1 is the device itself, like 127.0.0.1. :: is the unspecified address.',
+    },
+    {
+      question: 'Which DNS record holds an IPv6 address?',
+      answers: ['AAAA', 'A', 'A6M', 'PTR6'],
+      explanation: 'A holds IPv4 addresses and AAAA holds IPv6 addresses.',
+    },
+    {
+      question: 'How do you write port 8080 on 2001:db8::1 in a URL?',
+      answers: ['http://[2001:db8::1]:8080/', 'http://2001:db8::1:8080/', 'http://2001:db8::1/8080', 'http://(2001:db8::1):8080/'],
+      explanation: 'Brackets are needed because without them the port would read as part of the address.',
+    },
+    {
+      question: 'What happens if a firewall blocks all ICMPv6?',
+      answers: ['Neighbor discovery and Path MTU Discovery break', 'Nothing important, only ping stops', 'The network becomes more secure with no side effects', 'IPv6 falls back to ARP'],
+      explanation: 'IPv6 depends on ICMPv6, so only filter the types you have decided you do not need.',
+    },
+    {
+      question: 'A router gets a packet too large for the next link. What does it do?',
+      answers: ['Drops it and tells the sender "Packet Too Big"', 'Splits it into fragments', 'Sends it on anyway', 'Shortens the payload'],
+      explanation: 'In IPv6, only the sender fragments. This is why blocking ICMPv6 causes hanging connections.',
+    },
+    {
+      question: 'Your IPv6 network has no NAT. Do you still need a firewall?',
+      answers: ['Yes, global addresses can be reached directly', 'No, IPv6 addresses are too many to scan', 'No, IPv6 encrypts all traffic', 'Only for link-local addresses'],
+      explanation: 'NAT hid devices as a side effect. Without it, a firewall has to decide what gets in.',
+    },
+    {
+      question: 'How many IPv6 addresses can one network interface have?',
+      answers: ['Several at the same time', 'Exactly one', 'One global and nothing else', 'Two, one per protocol'],
+      explanation: 'One interface commonly has a link-local address plus one or more global addresses and maybe a ULA.',
+    },
+  ];
+
+  // Page elements we read from or write to.
+  const addressInput = document.getElementById('addressInput');
+  const exampleButtons = document.getElementById('exampleButtons');
+  const addressMessage = document.getElementById('addressMessage');
+  const explorerResults = document.getElementById('explorerResults');
+  const resultList = document.getElementById('resultList');
+  const partsTableBody = document.getElementById('partsTableBody');
+  const partsNote = document.getElementById('partsNote');
+  const subnetLink = document.getElementById('subnetLink');
+  const copyStatus = document.getElementById('copyStatus');
+  const practiceModeRadios = document.querySelectorAll('input[name="practiceMode"]');
+  const practicePrompt = document.getElementById('practicePrompt');
+  const practiceAddress = document.getElementById('practiceAddress');
+  const practiceInput = document.getElementById('practiceInput');
+  const practiceCheckButton = document.getElementById('practiceCheckButton');
+  const practiceRevealButton = document.getElementById('practiceRevealButton');
+  const practiceNextButton = document.getElementById('practiceNextButton');
+  const practiceScore = document.getElementById('practiceScore');
+  const practiceResult = document.getElementById('practiceResult');
+  const quizRestartButton = document.getElementById('quizRestartButton');
+  const quizScore = document.getElementById('quizScore');
+  const questionList = document.getElementById('questionList');
+  const pageLinkOutput = document.getElementById('pageLinkOutput');
+  const copyLinkButton = document.getElementById('copyLinkButton');
+  const linkCopyStatus = document.getElementById('linkCopyStatus');
+
+  /* ---------- Reading addresses (same parser as subnet-calculator.html) ---------- */
+
+  /** Read dotted IPv4 text into a BigInt. Throws an Error with a readable message. */
+  function parseIpv4(addressText) {
+    const octetTexts = addressText.split('.');
+    if (octetTexts.length !== 4) throw new Error(`"${addressText}" does not have four numbers separated by dots.`);
+    return octetTexts.reduce((addressValue, octetText) => {
+      if (!/^\d{1,3}$/.test(octetText) || Number(octetText) > 255 || (octetText.length > 1 && octetText.startsWith('0'))) {
+        throw new Error(`"${octetText}" in ${addressText} is not a number from 0 to 255 without leading zeros.`);
+      }
+      return (addressValue << 8n) | BigInt(octetText);
+    }, 0n);
+  }
+
+  /** Read one side of an IPv6 address into 16-bit groups, including a dotted IPv4 ending. */
+  function readIpv6Groups(sideText, addressText) {
+    if (sideText === '') return [];
+    const groups = [];
+    sideText.split(':').forEach((groupText, groupIndex, allGroups) => {
+      if (groupText.includes('.')) {
+        if (groupIndex !== allGroups.length - 1) throw new Error(`In ${addressText}, a dotted IPv4 part can only come last.`);
+        const ipv4Value = parseIpv4(groupText);
+        groups.push(ipv4Value >> 16n, ipv4Value & 0xffffn);
+        return;
+      }
+      if (!/^[0-9a-f]{1,4}$/i.test(groupText)) throw new Error(`"${groupText}" in ${addressText} is not 1 to 4 hex digits.`);
+      groups.push(BigInt(`0x${groupText}`));
+    });
+    return groups;
+  }
+
+  /** Read IPv6 text into a BigInt. Throws an Error with a readable message. */
+  function parseIpv6(rawAddressText) {
+    const addressText = rawAddressText.replace(/%.*$/, '');
+    if (!addressText.includes(':')) throw new Error(`"${addressText}" has no colons, so it is not an IPv6 address.`);
+    const sides = addressText.split('::');
+    if (sides.length > 2) throw new Error(`${addressText} has :: more than once. It can only appear once.`);
+
+    const leftGroups = readIpv6Groups(sides[0], addressText);
+    const rightGroups = sides.length === 2 ? readIpv6Groups(sides[1], addressText) : [];
+    const writtenCount = leftGroups.length + rightGroups.length;
+    if (sides.length === 1 && writtenCount !== 8) throw new Error(`${addressText} has ${writtenCount} groups. IPv6 needs 8, or :: to stand for the zeros.`);
+    if (sides.length === 2 && writtenCount > 7) throw new Error(`${addressText} has too many groups to use ::.`);
+
+    const zeroGroups = new Array(8 - writtenCount).fill(0n);
+    return [...leftGroups, ...zeroGroups, ...rightGroups].reduce((addressValue, groupValue) => (addressValue << 16n) | groupValue, 0n);
+  }
+
+  /** A mask with this many leading ones. */
+  function prefixToMask(prefixLength) {
+    return ALL_ONES ^ ((1n << BigInt(IPV6_BITS - prefixLength)) - 1n);
+  }
+
+  /** Read the explorer box: an address with an optional /prefix. */
+  function parseAddressAndPrefix(inputText) {
+    const pieces = inputText.trim().split(/\s*\/\s*/);
+    if (pieces.length > 2) throw new Error('Write one address and one prefix, such as 2001:db8::1/64.');
+    const addressValue = parseIpv6(pieces[0]);
+    if (pieces.length === 1) return { addressValue, prefixLength: null };
+    if (!/^\d+$/.test(pieces[1]) || Number(pieces[1]) > IPV6_BITS) {
+      throw new Error(`"${pieces[1]}" is not a prefix length. It should be a number from 0 to 128.`);
+    }
+    return { addressValue, prefixLength: Number(pieces[1]) };
+  }
+
+  /* ---------- Writing addresses ---------- */
+
+  /** The eight 16-bit groups of an address as numbers. */
+  function ipv6Groups(addressValue) {
+    return Array.from({ length: 8 }, (unused, groupIndex) => Number((addressValue >> BigInt(112 - groupIndex * 16)) & 0xffffn));
+  }
+
+  /** The short form from RFC 5952: the first longest run of two or more zero groups becomes ::. */
+  function formatIpv6(addressValue) {
+    const groups = ipv6Groups(addressValue);
+    let bestStart = -1;
+    let bestLength = 0;
+    let runStart = -1;
+    groups.forEach((groupValue, groupIndex) => {
+      if (groupValue !== 0) { runStart = -1; return; }
+      if (runStart === -1) runStart = groupIndex;
+      const runLength = groupIndex - runStart + 1;
+      if (runLength > bestLength) { bestStart = runStart; bestLength = runLength; }
+    });
+    const groupTexts = groups.map((groupValue) => groupValue.toString(16));
+    if (bestLength < 2) return groupTexts.join(':');
+    return `${groupTexts.slice(0, bestStart).join(':')}::${groupTexts.slice(bestStart + bestLength).join(':')}`;
+  }
+
+  /** Every group written out in full. */
+  function formatIpv6Expanded(addressValue) {
+    return ipv6Groups(addressValue).map((groupValue) => groupValue.toString(16).padStart(4, '0')).join(':');
+  }
+
+  /** The last 32 bits of an address written as dotted IPv4. */
+  function lastBitsAsIpv4(addressValue) {
+    return [24n, 16n, 8n, 0n].map((shift) => String((addressValue >> shift) & 255n)).join('.');
+  }
+
+  /** The bits from startBit up to endBit, counted from the left, as a number. */
+  function readBits(addressValue, startBit, endBit) {
+    return (addressValue >> BigInt(IPV6_BITS - endBit)) & ((1n << BigInt(endBit - startBit)) - 1n);
+  }
+
+  /** A part of an address in hex when it falls on hex digits, otherwise in binary. */
+  function formatBitRange(addressValue, startBit, endBit) {
+    const partValue = readBits(addressValue, startBit, endBit);
+    const bitCount = endBit - startBit;
+    if (startBit % 4 === 0 && bitCount % 4 === 0) return partValue.toString(16).padStart(bitCount / 4, '0');
+    return `${partValue.toString(2).padStart(bitCount, '0')} (binary)`;
+  }
+
+  /* ---------- Working out what an address is ---------- */
+
+  /** The first entry in ADDRESS_TYPES that holds this address. */
+  function findAddressType(addressValue) {
+    return ADDRESS_TYPES.find((addressType) => {
+      const { addressValue: rangeStart, prefixLength } = parseAddressAndPrefix(addressType.range);
+      return (addressValue & prefixToMask(prefixLength)) === rangeStart;
+    });
+  }
+
+  /** The MAC address inside an EUI-64 interface ID, or null when there is none. */
+  function embeddedMacAddress(addressValue) {
+    if (readBits(addressValue, 88, 104) !== 0xfffen) return null;
+    const firstByte = Number(readBits(addressValue, 64, 72)) ^ 0x02;
+    const macBytes = [firstByte, ...[72, 80, 104, 112, 120].map((startBit) => Number(readBits(addressValue, startBit, startBit + 8)))];
+    return macBytes.map((macByte) => macByte.toString(16).padStart(2, '0')).join(':');
+  }
+
+  /** The multicast group a unicast address listens on for neighbor discovery. */
+  function solicitedNodeAddress(addressValue) {
+    const baseValue = parseIpv6('ff02::1:ff00:0');
+    return formatIpv6(baseValue | (addressValue & 0xffffffn));
+  }
+
+  /** The name used for reverse DNS lookups: every hex digit, last one first. */
+  function reverseDnsName(addressValue) {
+    const hexDigits = addressValue.toString(16).padStart(32, '0');
+    return `${[...hexDigits].reverse().join('.')}.ip6.arpa`;
+  }
+
+  /** Name of a known multicast group, or an empty string. */
+  function describeMulticastGroup(addressValue) {
+    if (readBits(addressValue, 0, 104) === readBits(parseIpv6('ff02::1:ff00:0'), 0, 104)) return 'Solicited-node group, used by neighbor discovery';
+    const knownGroup = KNOWN_MULTICAST_GROUPS.find(([groupText]) => parseIpv6(groupText) === addressValue);
+    return knownGroup ? knownGroup[1] : '';
+  }
+
+  /** How the bits of each kind of address are divided: [part name, first bit, end bit]. */
+  function addressParts(kind) {
+    const interfaceId = ['Interface ID', 64, 128];
+    const partsByKind = {
+      global: [['Routing prefix', 0, 48], ['Subnet ID', 48, 64], interfaceId],
+      documentation: [['Documentation prefix', 0, 32], ['Site part', 32, 48], ['Subnet ID', 48, 64], interfaceId],
+      ula: [['Prefix', 0, 7], ['Locally assigned flag', 7, 8], ['Global ID', 8, 48], ['Subnet ID', 48, 64], interfaceId],
+      linkLocal: [['Prefix', 0, 10], ['Unused, normally zero', 10, 64], interfaceId],
+      multicast: [['Prefix', 0, 8], ['Flags', 8, 12], ['Scope', 12, 16], ['Group ID', 16, 128]],
+      mapped: [['Zeros', 0, 80], ['Marker', 80, 96], ['IPv4 address', 96, 128]],
+      nat64: [['NAT64 prefix', 0, 96], ['IPv4 address', 96, 128]],
+      '6to4': [['Prefix', 0, 16], ['IPv4 address', 16, 48], ['Subnet ID', 48, 64], interfaceId],
+    };
+    return partsByKind[kind] ?? [['Whole address', 0, 128]];
+  }
+
+  /** What each kind of address allows the page to add to its parts table. */
+  function partsNoteText(kind) {
+    if (kind === 'global' || kind === 'documentation') return 'This is the usual split. The real boundary between routing prefix and subnet ID depends on what the provider assigned.';
+    if (kind === 'ula') return 'The Global ID should be random, so two networks that merge later rarely clash.';
+    return '';
+  }
+
+  /** Every value about the address as [name, value, is prose] rows. */
+  function buildResultRows(addressValue, prefixLength, addressType) {
+    const shortForm = formatIpv6(addressValue);
+    const hasInterfaceId = ['global', 'documentation', 'ula', 'linkLocal'].includes(addressType.kind);
+    const resultRows = [
+      ['Short form', shortForm],
+      ['Full form', formatIpv6Expanded(addressValue)],
+      ['Type', `${addressType.name}. ${addressType.meaning}`, true],
+    ];
+
+    if (prefixLength !== null) {
+      const networkValue = addressValue & prefixToMask(prefixLength);
+      resultRows.push(
+        ['Network', `${formatIpv6(networkValue)}/${prefixLength}`],
+        ['Last address', formatIpv6(networkValue | (ALL_ONES ^ prefixToMask(prefixLength)))],
+        ['Addresses', (1n << BigInt(IPV6_BITS - prefixLength)).toLocaleString('en-US')],
+      );
+    }
+
+    if (addressType.kind === 'multicast') {
+      const scopeNumber = Number(readBits(addressValue, 12, 16));
+      resultRows.push(['Scope', MULTICAST_SCOPES[scopeNumber] ?? `Unassigned (${scopeNumber})`, true]);
+      const groupText = describeMulticastGroup(addressValue);
+      if (groupText) resultRows.push(['Group', groupText, true]);
+    }
+    if (addressType.kind === 'mapped' || addressType.kind === 'nat64') {
+      resultRows.push(['IPv4 address', lastBitsAsIpv4(addressValue)]);
+    }
+    if (addressType.kind === '6to4') {
+      resultRows.push(['IPv4 address', lastBitsAsIpv4(readBits(addressValue, 16, 48))]);
+    }
+    if (hasInterfaceId) {
+      const macAddress = embeddedMacAddress(addressValue);
+      if (macAddress) resultRows.push(['MAC address (EUI-64)', macAddress]);
+    }
+    if (hasInterfaceId) {
+      resultRows.push(['Solicited-node group', solicitedNodeAddress(addressValue)]);
+    }
+    resultRows.push(
+      ['In a URL', `http://[${shortForm}]/`],
+      ['Reverse DNS name', reverseDnsName(addressValue)],
+    );
+    return resultRows;
+  }
+
+  /* ---------- Drawing the explorer ---------- */
+
+  function renderResultRows(resultRows) {
+    resultList.replaceChildren();
+    resultRows.forEach(([rowName, rowValue, isProse]) => {
+      const listItem = document.createElement('li');
+
+      const nameText = document.createElement('span');
+      nameText.className = 'result-name';
+      nameText.textContent = rowName;
+
+      const valueText = document.createElement('span');
+      valueText.className = isProse ? 'result-value plain-value' : 'result-value';
+      valueText.textContent = rowValue;
+
+      const copyButton = document.createElement('button');
+      copyButton.type = 'button';
+      copyButton.className = 'secondary small-button';
+      copyButton.textContent = 'Copy';
+      copyButton.dataset.copyValue = rowValue;
+      copyButton.setAttribute('aria-label', `Copy ${rowName}`);
+
+      listItem.append(nameText, valueText, copyButton);
+      resultList.appendChild(listItem);
+    });
+  }
+
+  function renderParts(addressValue, kind) {
+    partsTableBody.replaceChildren(...addressParts(kind).map(([partName, startBit, endBit]) => {
+      const tableRow = document.createElement('tr');
+      const nameCell = document.createElement('td');
+      nameCell.textContent = partName;
+      const valueCell = document.createElement('td');
+      valueCell.className = 'mono';
+      valueCell.textContent = partName === 'IPv4 address'
+        ? lastBitsAsIpv4(readBits(addressValue, startBit, endBit))
+        : formatBitRange(addressValue, startBit, endBit);
+      const bitsCell = document.createElement('td');
+      bitsCell.className = 'nowrap muted';
+      bitsCell.textContent = `${endBit - startBit}`;
+      tableRow.append(nameCell, valueCell, bitsCell);
+      return tableRow;
+    }));
+    const noteText = partsNoteText(kind);
+    partsNote.textContent = noteText;
+    partsNote.hidden = !noteText;
+  }
+
+  /** Re-read the explorer box and redraw. */
+  function refreshExplorer() {
+    copyStatus.textContent = '';
+    linkCopyStatus.textContent = '';
+    pageLinkOutput.value = buildPageLink();
+
+    const inputText = addressInput.value.trim();
+    let messageText = '';
+    let parsedInput = null;
+    if (inputText === '') {
+      messageText = 'Type an address above, such as 2001:db8::1/64.';
+    } else {
+      try {
+        parsedInput = parseAddressAndPrefix(inputText);
+      } catch (parseError) {
+        messageText = parseError.message;
+      }
+    }
+    addressInput.classList.toggle('invalid', !parsedInput && inputText !== '');
+    addressMessage.textContent = messageText;
+    addressMessage.hidden = !messageText;
+    explorerResults.hidden = !parsedInput;
+    if (!parsedInput) return;
+
+    const { addressValue, prefixLength } = parsedInput;
+    const addressType = findAddressType(addressValue);
+    renderResultRows(buildResultRows(addressValue, prefixLength, addressType));
+    renderParts(addressValue, addressType.kind);
+    subnetLink.href = `subnet-calculator.html?ip=${formatIpv6(addressValue)}/${prefixLength ?? DEFAULT_PREFIX}`;
+  }
+
+  function fillExampleButtons() {
+    EXAMPLE_ADDRESSES.forEach(([buttonText, exampleAddress]) => {
+      const exampleButton = document.createElement('button');
+      exampleButton.type = 'button';
+      exampleButton.className = 'secondary small-button';
+      exampleButton.textContent = buttonText;
+      exampleButton.addEventListener('click', () => {
+        addressInput.value = exampleAddress;
+        refreshExplorer();
+      });
+      exampleButtons.appendChild(exampleButton);
+    });
+  }
+
+  /* ---------- Practice ---------- */
+
+  // The address being practiced, and how many were answered right out of how many tried.
+  let practiceValue = 0n;
+  let practiceRightCount = 0;
+  let practiceTriedCount = 0;
+  let practiceIsAnswered = false;
+
+  const randomInteger = (limit) => Math.floor(Math.random() * limit);
+
+  /** A documentation address with a run of zero groups and some short groups, so there is something to shorten. */
+  function randomPracticeAddress() {
+    const groups = [0x2001, 0x0db8, 0, 0, 0, 0, 0, 0];
+    const runLength = 2 + randomInteger(3);
+    const runStart = 2 + randomInteger(7 - runLength);
+    const digitLimits = [0x10, 0x100, 0x1000, 0x10000];
+
+    for (let groupIndex = 2; groupIndex < 8; groupIndex++) {
+      const isInRun = groupIndex >= runStart && groupIndex < runStart + runLength;
+      // Now and then a group outside the run is a lone zero, which must stay as 0 in the short form.
+      if (!isInRun) groups[groupIndex] = randomInteger(5) === 0 ? 0 : 1 + randomInteger(digitLimits[randomInteger(4)] - 1);
+    }
+    return groups.reduce((addressValue, groupValue) => (addressValue << 16n) | BigInt(groupValue), 0n);
+  }
+
+  function selectedPracticeMode() {
+    return [...practiceModeRadios].find((modeRadio) => modeRadio.checked).value;
+  }
+
+  function showPracticeResult(messageClass, messageText) {
+    practiceResult.className = messageClass;
+    practiceResult.textContent = messageText;
+    practiceResult.hidden = false;
+  }
+
+  function renderPracticeScore() {
+    practiceScore.textContent = practiceTriedCount ? `${practiceRightCount} of ${practiceTriedCount} right` : '';
+  }
+
+  function nextPracticeAddress() {
+    practiceValue = randomPracticeAddress();
+    const isShorten = selectedPracticeMode() === 'shorten';
+    practicePrompt.textContent = isShorten
+      ? 'Write this address in its standard short form.'
+      : 'Write this address in full, with all eight groups and four digits in each.';
+    practiceAddress.textContent = isShorten ? formatIpv6Expanded(practiceValue) : formatIpv6(practiceValue);
+    practiceInput.value = '';
+    practiceInput.classList.remove('invalid');
+    practiceResult.hidden = true;
+    practiceIsAnswered = false;
+  }
+
+  /** Check the typed answer. A wrong spelling of the right address gets its own message. */
+  function checkPracticeAnswer() {
+    const typedText = practiceInput.value.trim();
+    if (typedText === '') return;
+    const isShorten = selectedPracticeMode() === 'shorten';
+    const rightAnswer = isShorten ? formatIpv6(practiceValue) : formatIpv6Expanded(practiceValue);
+    const isRight = typedText === rightAnswer;
+
+    if (!practiceIsAnswered) {
+      practiceTriedCount += 1;
+      if (isRight) practiceRightCount += 1;
+      practiceIsAnswered = true;
+      renderPracticeScore();
+    }
+    if (isRight) {
+      showPracticeResult('right-message', 'Correct.');
+      return;
+    }
+
+    let typedValue = null;
+    try { typedValue = parseIpv6(typedText); } catch (parseError) { typedValue = null; }
+    if (typedValue === practiceValue) {
+      showPracticeResult('wrong-message', isShorten
+        ? 'That is the same address, but not the standard short form. Check for leading zeros, uppercase, and that the longest zero run is the one shortened.'
+        : 'That is the same address, but not written in full. Every group needs four digits.');
+    } else if (typedValue === null) {
+      showPracticeResult('wrong-message', 'That is not a valid IPv6 address.');
+    } else {
+      showPracticeResult('wrong-message', `That is a different address: ${formatIpv6(typedValue)}.`);
+    }
+  }
+
+  function revealPracticeAnswer() {
+    const isShorten = selectedPracticeMode() === 'shorten';
+    if (!practiceIsAnswered) {
+      practiceTriedCount += 1;
+      practiceIsAnswered = true;
+      renderPracticeScore();
+    }
+    showPracticeResult('warning-message', `The answer is ${isShorten ? formatIpv6(practiceValue) : formatIpv6Expanded(practiceValue)}.`);
+  }
+
+  /* ---------- Quiz ---------- */
+
+  let quizAnsweredCount = 0;
+  let quizRightCount = 0;
+
+  /** A shuffled copy of a list (Fisher-Yates). */
+  function shuffled(listItems) {
+    const shuffledItems = [...listItems];
+    for (let lastIndex = shuffledItems.length - 1; lastIndex > 0; lastIndex--) {
+      const swapIndex = randomInteger(lastIndex + 1);
+      [shuffledItems[lastIndex], shuffledItems[swapIndex]] = [shuffledItems[swapIndex], shuffledItems[lastIndex]];
+    }
+    return shuffledItems;
+  }
+
+  function renderQuizScore() {
+    const questionCount = QUIZ_QUESTIONS.length;
+    if (quizAnsweredCount === 0) {
+      quizScore.textContent = `${questionCount} questions. Pick an answer to see if it is right.`;
+    } else if (quizAnsweredCount < questionCount) {
+      quizScore.textContent = `${quizRightCount} right out of ${quizAnsweredCount} answered, ${questionCount - quizAnsweredCount} left.`;
+    } else {
+      quizScore.textContent = `Finished: ${quizRightCount} of ${questionCount} right.`;
+    }
+  }
+
+  /** Lock a question once it is answered, mark the answers, and show why. */
+  function answerQuestion(questionBox, chosenOption, quizQuestion) {
+    const chosenIsRight = chosenOption.dataset.isRight === 'true';
+    quizAnsweredCount += 1;
+    if (chosenIsRight) quizRightCount += 1;
+
+    questionBox.querySelectorAll('.answer-option').forEach((answerOption) => {
+      answerOption.querySelector('input').disabled = true;
+      if (answerOption.dataset.isRight === 'true') answerOption.classList.add('is-right');
+      else if (answerOption === chosenOption) answerOption.classList.add('is-wrong');
+    });
+
+    const explanationElement = document.createElement('p');
+    explanationElement.className = chosenIsRight ? 'right-message' : 'wrong-message';
+    explanationElement.textContent = `${chosenIsRight ? 'Correct.' : 'Not quite.'} ${quizQuestion.explanation}`;
+    questionBox.appendChild(explanationElement);
+    renderQuizScore();
+  }
+
+  /** One question with its answers in random order. */
+  function buildQuestion(quizQuestion, questionIndex) {
+    const listItem = document.createElement('li');
+    const questionBox = document.createElement('fieldset');
+    const legendElement = document.createElement('legend');
+    legendElement.textContent = quizQuestion.question;
+    questionBox.appendChild(legendElement);
+
+    const answerEntries = quizQuestion.answers.map((answerText, answerIndex) => ({ answerText, isRight: answerIndex === 0 }));
+    shuffled(answerEntries).forEach(({ answerText, isRight }) => {
+      const answerOption = document.createElement('label');
+      answerOption.className = 'answer-option';
+      answerOption.dataset.isRight = String(isRight);
+      const answerRadio = document.createElement('input');
+      answerRadio.type = 'radio';
+      answerRadio.name = `question${questionIndex}`;
+      const answerLabel = document.createElement('span');
+      answerLabel.textContent = answerText;
+      answerRadio.addEventListener('change', () => answerQuestion(questionBox, answerOption, quizQuestion));
+      answerOption.append(answerRadio, answerLabel);
+      questionBox.appendChild(answerOption);
+    });
+
+    listItem.appendChild(questionBox);
+    return listItem;
+  }
+
+  /** Draw the questions in a new random order with nothing answered. */
+  function startQuiz() {
+    quizAnsweredCount = 0;
+    quizRightCount = 0;
+    questionList.replaceChildren(...shuffled(QUIZ_QUESTIONS).map(buildQuestion));
+    renderQuizScore();
+  }
+
+  /* ---------- Clipboard ---------- */
+
+  /** Put text on the clipboard, with the older copy command as a fallback. */
+  async function writeToClipboard(plainText) {
+    try {
+      await navigator.clipboard.writeText(plainText);
+      return true;
+    } catch (clipboardError) {
+      const fillClipboard = (copyEvent) => {
+        copyEvent.clipboardData.setData('text/plain', plainText);
+        copyEvent.preventDefault();
+      };
+      document.addEventListener('copy', fillClipboard, { once: true });
+      const copySucceeded = document.execCommand('copy');
+      document.removeEventListener('copy', fillClipboard);
+      return copySucceeded;
+    }
+  }
+
+  /* ---------- Link with the address filled in ---------- */
+
+  function buildPageLink() {
+    const pageAddress = window.location.href.split(/[?#]/)[0];
+    const addressText = addressInput.value.trim().replace(/%/g, '%25');
+    return addressText ? `${pageAddress}?address=${addressText}#explorer` : pageAddress;
+  }
+
+  /* ---------- Events ---------- */
+
+  addressInput.addEventListener('input', refreshExplorer);
+
+  // One listener on the list covers every copy button in it.
+  resultList.addEventListener('click', async (clickEvent) => {
+    const copyValue = clickEvent.target.dataset.copyValue;
+    if (copyValue === undefined) return;
+    const copySucceeded = await writeToClipboard(copyValue);
+    copyStatus.textContent = copySucceeded ? 'Copied' : 'Your browser blocked the clipboard.';
+  });
+
+  practiceModeRadios.forEach((modeRadio) => modeRadio.addEventListener('change', nextPracticeAddress));
+  practiceCheckButton.addEventListener('click', checkPracticeAnswer);
+  practiceRevealButton.addEventListener('click', revealPracticeAnswer);
+  practiceNextButton.addEventListener('click', nextPracticeAddress);
+  practiceInput.addEventListener('keydown', (keyEvent) => {
+    if (keyEvent.key === 'Enter') checkPracticeAnswer();
+  });
+
+  quizRestartButton.addEventListener('click', startQuiz);
+
+  copyLinkButton.addEventListener('click', async () => {
+    const copySucceeded = await writeToClipboard(pageLinkOutput.value);
+    if (!copySucceeded) pageLinkOutput.select();
+    linkCopyStatus.textContent = copySucceeded ? 'Copied' : 'Selected. Press Ctrl+C to copy.';
+  });
+
+  /* ---------- Start ---------- */
+
+  fillExampleButtons();
+  addressInput.value = new URLSearchParams(window.location.search).get('address') ?? EXAMPLE_ADDRESSES[3][1];
+  refreshExplorer();
+  nextPracticeAddress();
+  startQuiz();
+</script>
+</body>
+</html>
