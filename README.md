@@ -28,6 +28,14 @@ To add a tool, drop its HTML file in the repo and add an entry to `tools.json`:
 `index.html` reads `tools.json` with `fetch()`, so open it through a web server
 (for example GitHub Pages or `python3 -m http.server`), not straight from disk.
 
+## SQL scripts
+
+Scripts that aren't browser tools live in the `sql` folder, one folder per script.
+
+| Script | Folder | What it does |
+| --- | --- | --- |
+| PatrullPerson change log | [sql/PatrullPersonChangeLog](sql/PatrullPersonChangeLog) | SQL Server Agent job that logs added and deleted PatrullID/PersonID pairs every 5 minutes, with an archive table and a timeline view |
+
 ## Releases
 
 Every push to `main` creates a GitHub Release with a zip of all the tool files
